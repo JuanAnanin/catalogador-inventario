@@ -1,0 +1,112 @@
+@startuml
+!include estilo.iuml
+title Paquetes excel y util
+package excel {
+  class LectorTablas <<utilidad>> {
+    + {static} hojas(f : File) : List<String>
+    + {static} recorrer(f, hoja, receptor, progreso) : void
+    + {static} leerHoja(f, hoja, maxFilas) : Hoja
+    + {static} leer(f : File) : List<Hoja>
+    - {static} recorrerXlsx(...) : void
+    - {static} recorrerCsv(...) : void
+  }
+  interface "LectorTablas.Receptor" as Rec {
+    + fila(numFila : int, celdas : String[]) : boolean
+  }
+  interface "LectorTablas.Progreso" as Pro {
+    + avance(hecho : long, total : long) : void
+  }
+  class Hoja {
+    - nombre : String
+    - filas : List<List<String>>
+    + numFilas() / numColumnas() : int
+    + celda(fila, col) : String
+    + filaVacia(fila) : boolean
+    + filaCabeceraProbable() : int
+    + {static} letra(col) : String
+  }
+  class EscritorXlsx <<utilidad>> {
+    + {static} MAX_FILAS_HOJA = 1048575
+    + {static} NORMAL, CABECERA, VERDE, NARANJA,\n  GRIS, NEGRITA, CABECERA_AMARILLA : int
+    + {static} escribir(destino, hojas : List<HojaSalida>) : void
+    + {static} nombreValido(nombre) : String
+  }
+  interface "EscritorXlsx.Filas" as Filas {
+    + numero() : int
+    + fila(i : int) : Object[]
+  }
+  class "EscritorXlsx.HojaSalida" as HS {
+    - nombre : String
+    - cabecera : List<String>
+    - filas : Filas
+    + anadir(valores...) : void
+    + sinFiltro() / sinFijarCabecera()
+    + estiloCabecera(e) / anchos(a...)
+  }
+  class "EscritorXlsx.Celda" as CE {
+    - valor : Object
+    - estilo : int
+  }
+  class EscritorCsv <<utilidad>> {
+    + {static} SEPARADOR = ';'
+    + {static} escribir(destino, cabecera, filas : Filas) : void
+  }
+  LectorTablas ..> Rec : entrega filas
+  LectorTablas ..> Pro : informa
+  LectorTablas ..> Hoja : crea
+  EscritorXlsx ..> HS
+  HS --> Filas
+  HS o-- "0..*" CE
+  EscritorCsv ..> Filas
+}
+package util {
+  class Texto <<utilidad>> {
+    + {static} normalizar(s) : String
+    + {static} limpio(s) : String
+    + {static} palabrasSignificativas(norm) : String[]
+    + {static} clave(s) : String
+    + {static} distancia(a, b, max) : int
+    + {static} html(s) : String
+  }
+  class Tsv <<utilidad>> {
+    + {static} linea(campos...) : String
+    + {static} campos(linea) : String[]
+    + {static} escribirAtomico(destino, contenido) : void
+    + {static} recorrer(p, lector) : void
+    + {static} primeraLinea(p) : String
+  }
+  class Diario {
+    - fichero : Path
+    + anadir(lineas) : void
+    + leer() : List<String>
+    + tamano() : int
+    + vaciar() : void
+  }
+  class Json <<utilidad>> {
+    + {static} leer(texto) : Object
+    + {static} escribir(valor) : String
+    + {static} extraer(texto) : Object
+    + {static} ruta(json, pasos...) : Object
+    + {static} texto(v) / entero(v, def)
+  }
+  class Ficheros <<utilidad>> {
+    + {static} WINDOWS, MAC : boolean
+    + {static} reemplazar(temporal, destino) : void
+    + {static} mensaje(error) : String
+    + {static} abrir(f) / navegar(url) : boolean
+    + {static} escritorio() : Path
+  }
+}
+Filas -[hidden]down- Texto
+CE -[hidden]down- Tsv
+note bottom of Ficheros
+  reemplazar: renombrado atómico con reintentos
+  (Windows: antivirus o Excel con el fichero abierto).
+  escritorio: también el de OneDrive.
+end note
+note left of LectorTablas
+  .xlsx: ZIP + StAX en flujo (una fila cada vez);
+  progreso a partir de <dimension> de la hoja.
+  .csv: UTF-8 o Windows-1252, separador detectado.
+end note
+@enduml

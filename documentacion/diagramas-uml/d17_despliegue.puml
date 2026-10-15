@@ -1,0 +1,46 @@
+@startuml
+!include estilo.iuml
+title Diagrama de despliegue
+node "Ordenador del usuario\n(Windows, macOS o Linux)" as PC {
+  node "Java Runtime 11+\n(hasta el 60 % de la RAM)" as JRE {
+    artifact "Catalogador.jar" as JAR
+  }
+  artifact "Abrir Catalogador (Windows).bat\nCatalogador.app (macOS)\nAbrir Catalogador (Linux).sh" as LAN
+  folder "Catalogador  (datos, en la carpeta personal)" as DAT {
+    file "catalogos/GMDN.tsv\ncatalogos/MANTENIMIENTO.tsv" as F1
+    file "memoria.tsv\nmemoria.diario.tsv" as F2
+    folder "proyectos/<nombre_fecha>/" as PR {
+      file "inventario.tsv\nestado.tsv · cambios.tsv\nia_propuestas.tsv" as F3
+    }
+    file "config.properties · ia.properties\n.bloqueo · errores.log" as F4
+  }
+  folder "Ficheros del usuario" as US {
+    file "Inventario (.xlsx / .csv)\n600.000 filas o más" as I1
+    file "Catálogos (.xlsx)\nhojas GMDN y Mantenimiento" as I2
+    file "<nombre>_<centro>.xlsx / .csv\n(resultado)" as O1
+    file "Catalogos_actualizados.xlsx" as O2
+  }
+}
+F1 -[hidden]right- F2
+PR -[hidden]right- F4
+F1 -[hidden]down- PR
+I1 -[hidden]down- I2
+O1 -[hidden]down- O2
+LAN --> JAR : lanza
+JAR --> DAT : lee / escribe\n(atómico + diarios)
+I1 --> JAR : importar (en flujo)
+I2 --> JAR : importar
+JAR --> O1 : exportar
+JAR --> O2 : exportar
+node "Ollama (localhost:11434, API /api/chat)\no LM Studio (localhost:1234/v1)\n(opcional, mismo ordenador)" as OLL
+node "Servidor de IA del hospital\n(Ollama, vLLM… en la red; opcional)" as SRV
+cloud "Servicio de IA en la nube (opcional, HTTPS 443)\nOpenAI · Gemini · Anthropic · Groq · Mistral · DeepSeek\nOpenRouter · Cerebras · Cohere · xAI · Hugging Face" as NUBE
+JAR ..> OLL : HTTP local, sin proxy\n(modo IA local)
+JAR ..> SRV : HTTP(S) en la red\ndel hospital
+JAR ..> NUBE : HTTPS + clave API\n(proxy y certificados del sistema)
+note bottom of PC
+  Aplicación de escritorio monopuesto, sin servidor ni base de datos.
+  En modo manual no necesita red; en modo IA solo conecta con
+  el servicio elegido (respetando el proxy del sistema).
+end note
+@enduml

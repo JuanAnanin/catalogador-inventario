@@ -1,0 +1,45 @@
+@startuml
+!include estilo.iuml
+title Secuencia: guardar una catalogación (Intro o «Aceptar sugerencia»)
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "Grupo\n(actual)" as G
+participant "Memoria" as ME
+participant "Almacen" as AL
+participant "Diario\n(cambios.tsv)" as DC
+participant "Diario\n(memoria.diario.tsv)" as DM
+alt Intro con un resultado seleccionado
+  Usuario -> VP : Intro
+  VP -> VP : guardar()\nt = terminoSeleccionado()
+  VP -> VP : asignar(t.lista, t.codigo, t.nombre, "Buscador")
+else ⌘1 / botón «Aceptar sugerencia»
+  Usuario -> VP : aceptarSugerencia(0)
+  VP -> VP : asignar(s.lista, s.codigo, s.nombre,\n"Sugerencia (98% parecido)")
+end
+VP -> G : asignar(lista, codigo, nombre, origen, fecha)
+note right of G : estado = REVISADO\n(en Mantenimiento, codigo = nombre)
+VP -> G : setMarcaCorregida / setModeloCorregido
+VP -> ME : aprender(…) · aprenderMarca(…) · aprenderModelo(…)
+note right of ME : se actualiza el índice de trigramas;\nlas líneas quedan pendientes
+VP -> VP : persistir(actual)
+activate VP
+VP -> AL : registrarCambio(proyecto, grupo)
+AL -> DC : anadir("GRUPO\\tclave\\testado…")
+note right of DC
+  añade al final y fuerza a disco
+  (0,5 ms con cualquier tamaño)
+end note
+opt más de 2.000 cambios en el diario
+  AL -> AL : guardarEstado(p)\n(estado.tsv atómico y diario vacío)
+end
+VP -> ME : guardarCambios()
+ME -> DM : anadir(pendientes)
+opt más de 5.000 líneas
+  ME -> ME : compactar() (memoria.tsv atómico)
+end
+VP -> VP : refrescarProgreso() / refrescarCola()
+deactivate VP
+VP -> VP : avanzar() → mostrarGrupo(siguiente)
+VP --> Usuario : siguiente grupo
+@enduml

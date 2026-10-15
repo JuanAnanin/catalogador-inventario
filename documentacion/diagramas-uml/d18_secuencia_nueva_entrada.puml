@@ -1,0 +1,42 @@
+@startuml
+!include estilo.iuml
+title Secuencia: crear una entrada en el catálogo de Mantenimiento
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "DialogoEntrada\nMantenimiento" as DE
+participant "Catalogos" as CA
+participant "Tsv" as TSV
+Usuario -> VP : «+ Nueva entrada…» (⌘⇧N)
+VP -> DE : crear(catalogos, nombre del equipo)
+activate DE
+DE -> CA : opcionesNivel(0, "")
+CA --> DE : tipos de activo existentes
+loop cada nivel (tipo, uso, familia, subfamilia, subgrupo)
+  Usuario -> DE : elige una opción existente
+  DE -> CA : opcionesNivel(nivel + 1, código elegido)
+  CA --> DE : opciones del nivel siguiente
+  alt elige «+ Nuevo…»
+    DE -> CA : siguienteCodigo(nivel, código del nivel anterior)
+    CA --> DE : p. ej. «010303» (padre + 2 cifras)
+    Usuario -> DE : revisa el código y escribe el nombre
+  end
+end
+Usuario -> DE : «Crear entrada»
+DE -> CA : existeNombreMantenimiento(nombre)\nnombreDeCodigo(nivel, código)
+alt datos correctos
+  DE -> CA : anadirMantenimiento(11 columnas)
+  activate CA
+  CA -> CA : TerminoOficial.mantenimiento(datos, creado = true, fecha)
+  CA -> CA : insertarOrdenado()\n(tras su subgrupo, subfamilia, familia…)
+  CA -> TSV : escribirAtomico(MANTENIMIENTO.tsv)
+  CA -> CA : publicar el catálogo nuevo (volatile)
+  deactivate CA
+  DE --> VP : entrada creada
+else nombre repetido, nivel sin elegir o código ocupado
+  DE -> Usuario : aviso junto al campo
+end
+deactivate DE
+VP -> VP : trasCambiarCatalogo(t)\nbuscar y seleccionar la entrada
+VP --> Usuario : lista para asignar con Intro
+@enduml

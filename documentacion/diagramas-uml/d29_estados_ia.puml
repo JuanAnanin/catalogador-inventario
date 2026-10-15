@@ -1,0 +1,31 @@
+@startuml
+!include estilo.iuml
+title Estados del modo IA y de la propuesta de un grupo
+state "Modo manual" as Manual : no se envía nada fuera
+state "Modo IA" as IA {
+  [*] --> Lista
+  Lista : servicio configurado
+  Lista --> Consultando : mostrar un grupo sin propuesta\n/ pedir todas
+  Consultando --> Lista : respuesta / error de grupo
+  Consultando --> EnPausa : clave, saldo, cuota,\nmodelo o sin conexión
+  EnPausa : la cabecera dice «(en pausa)»;\nno se hacen más consultas
+  EnPausa --> Lista : Ctrl+Mayús+I (reintentar)\n/ cambiar la configuración
+}
+[*] --> Manual
+Manual --> IA : IA → Modo de trabajo\n[servicio listo]
+IA --> Manual : IA → Modo de trabajo
+Manual --> EnPausa : elegir IA sin clave
+||
+state "Propuesta de un grupo" as P {
+  [*] --> SinConsultar
+  SinConsultar --> Pedida : pedirIA / pedir todas
+  Pedida --> ConTermino : la IA elige un candidato
+  Pedida --> SinTermino : ningún candidato encaja
+  Pedida --> ConError : fallo pasajero
+  ConError --> Pedida : Ctrl+Mayús+I
+  ConTermino --> Aceptada : Ctrl+I / Ctrl+1 / en bloque
+  ConTermino --> SinConsultar : Ctrl+Mayús+I (se olvida)
+  SinTermino --> SinConsultar : Ctrl+Mayús+I
+  Aceptada : el grupo pasa a REVISADO\ncon origen «IA: …»
+}
+@enduml

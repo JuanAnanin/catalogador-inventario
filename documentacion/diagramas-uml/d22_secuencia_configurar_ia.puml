@@ -1,0 +1,55 @@
+@startuml
+!include estilo.iuml
+title Secuencia: configurar el servicio de IA y probar la conexión
+autonumber
+actor Usuario
+participant "DialogoModo" as DM
+participant "ConfigIA\n(copia de trabajo)" as CF
+participant "ClienteIA" as CL
+participant "HttpClient\n(java.net.http)" as H
+participant "Servicio de IA" as S
+Usuario -> DM : elige «Modo IA» y un servicio\n(Gratuitas / Con versión gratuita / De pago / Otro)
+DM -> CF : recogerProveedor() del anterior\n(clave, modelo, dirección)
+DM -> DM : elegirProveedor(p): nota, dirección,\nclave guardada, modelos propuestos
+Usuario -> DM : pega la clave API
+opt «¿Cómo se consigue?» / «¿Cómo se instala?»
+  DM -> Usuario : pasos para conseguir la clave\n(ProveedorIA.getPasos())
+end
+opt «Conseguir una clave →» / «Descargar Ollama →»
+  DM -> Usuario : abre la web del servicio en el navegador
+end
+opt «Cargar modelos»
+  DM -> CL : ClienteIA.desde(cfg, p).modelos()
+  CL -> H : GET {url}/models (Bearer o x-api-key)\no GET /api/tags en Ollama
+  H -> S
+  S --> H : {"data":[{"id":…}]}
+  CL --> DM : lista (sin modelos de imagen, voz o vectores)
+  DM -> Usuario : desplegable con los modelos
+end
+Usuario -> DM : «Probar conexión»
+DM -> CL : probar()
+opt Ollama
+  CL -> H : GET /api/tags: ¿está descargado el modelo?
+end
+CL -> H : POST /chat/completions, /messages o /api/chat\ncon las opciones del servicio · «Devuelve {"ok": true}»
+H -> S
+alt 200
+  S --> CL : respuesta
+  CL --> DM : «Conexión correcta: … responde en 0,8 s»
+else error
+  S --> CL : 401 / 402 / 404 / 429…
+  CL --> DM : ErrorIA con mensaje claro\n(clave no válida, sin saldo, modelo inexistente…)
+end
+Usuario -> DM : «Aceptar» / «Empezar en modo IA»
+DM -> CF : estaListo(p)?
+alt falta la clave o el modelo
+  DM -> Usuario : «Falta la clave API…» (no se cierra)
+else listo
+  DM -> CF : setModo(IA) · setProveedor(p) · guardar()
+  DM --> Usuario : se cierra; la cabecera muestra\n«Modo IA · servicio · modelo»
+end
+note over DM, CF
+  Si se cancela, la configuración se vuelve a leer
+  del disco: lo escrito en el diálogo se descarta.
+end note
+@enduml

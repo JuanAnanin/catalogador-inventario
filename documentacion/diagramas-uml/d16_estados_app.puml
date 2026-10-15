@@ -1,0 +1,40 @@
+@startuml
+!include estilo.iuml
+title Diagrama de estados de la aplicación
+[*] --> Cargando : abrir programa
+Cargando : carga catálogos, memoria\ny último proyecto (segundo plano)
+Cargando --> EligiendoModo : preguntar al empezar\n(o primera vez)
+Cargando --> Bienvenida : no hay proyecto
+Cargando --> Trabajando : último proyecto encontrado
+EligiendoModo : diálogo «¿Cómo quieres trabajar?»
+EligiendoModo --> Bienvenida : aceptar / seguir como estaba\n[no hay proyecto]
+EligiendoModo --> Trabajando : aceptar / seguir como estaba\n[hay proyecto]
+Bienvenida --> Trabajando : nuevo proyecto /\nabrir proyecto
+state Trabajando {
+  [*] --> RevisandoPendientes
+  RevisandoPendientes : la cola muestra «Pendientes»
+  RevisandoPospuestos : la cola muestra «Pospuestos»
+  RevisandoPendientes --> RevisandoPospuestos : «Revisar los pospuestos»\no fin de pendientes [hay dudas]
+  RevisandoPospuestos --> RevisandoPendientes : cambiar filtro de la cola
+  ||
+  state "Buscador" as B {
+    [*] --> GMDN
+    GMDN --> Mantenimiento : Ctrl+L
+    Mantenimiento --> GMDN : Ctrl+L
+  }
+  ||
+  state "Modo" as MO {
+    [*] --> Manual
+    Manual --> IA : IA → Modo de trabajo
+    IA --> Manual : IA → Modo de trabajo
+  }
+}
+Trabajando --> Terminado : no quedan pendientes\nni pospuestos
+Terminado : «¡Todo revisado!»\nbotones de revisión desactivados
+Terminado --> Trabajando : devolver a pendiente /\nnuevo proyecto
+Trabajando --> Trabajando : exportar resultado /\ncatálogos
+Terminado --> Terminado : exportar
+Bienvenida --> [*] : salir
+Trabajando --> [*] : salir (todo ya guardado)
+Terminado --> [*] : salir
+@enduml

@@ -1,0 +1,22 @@
+Diagramas UML del Catalogador (versión 3.1)
+==========================================
+Cada diagrama está en dos formatos:
+  .puml  fuente de texto de PlantUML (editable; incluye estilo.iuml)
+  .svg   imagen vectorial (se abre con cualquier navegador)
+Todos aparecen, explicados, en 02_Diagramas_UML_y_Diseno.pdf.
+
+Para regenerarlos tras un cambio:  java -jar plantuml.jar -charset UTF-8 -tsvg *.puml
+(requiere PlantUML 1.2025 o posterior y Graphviz).
+
+Casos de uso ........ d01 general · d01b modo IA
+Estructura .......... d02 paquetes · d02b componentes · d17 despliegue · d30 ficheros de datos
+Clases .............. d03 vista general · d04 modelo · d05 / d05b lógica · d06 excel y util
+                      d07 interfaz · d20 ia
+Secuencia ........... d21 arranque y elección del modo · d10 crear proyecto · d12 buscar
+                      d13 sugerir (memoria + IA) · d11 guardar · d18 nueva entrada de mantenimiento
+                      d14 exportar resultado · d26 resultado anterior · d22 configurar la IA
+                      d23 propuesta de la IA · d24 consulta HTTP y errores
+                      d25 pedir todas las propuestas y aceptar en bloque
+Actividad (flujo) ... d08 flujo de trabajo · d09 revisión de un grupo · d19 lectura del inventario
+                      d27 consulta a la IA · d28 guardado y recuperación
+Estados ............. d15 grupo · d16 aplicación · d29 modo IA y propuesta

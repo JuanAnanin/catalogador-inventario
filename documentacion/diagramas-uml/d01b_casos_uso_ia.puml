@@ -1,0 +1,50 @@
+@startuml
+!include estilo.iuml
+title Casos de uso del modo IA (detalle)
+left to right direction
+skinparam packageStyle rectangle
+actor "Persona que cataloga" as U
+actor "Servicio de IA" as IA <<sistema>>
+rectangle "Modo IA" {
+  usecase "CU-14 Elegir modo\n(al abrir o desde el menú IA)" as CU14
+  usecase "CU-15 Configurar servicio" as CU15
+  usecase "Elegir servicio por categoría:\ngratuito · con versión gratuita · de pago" as E1
+  usecase "Pegar la clave API" as E2
+  usecase "Cargar modelos\n(GET /models)" as E3
+  usecase "Probar conexión" as E4
+  usecase "CU-16 Revisar la propuesta\n(aceptar con Ctrl+I)" as CU16
+  usecase "Volver a preguntar\n(Ctrl+Mayús+I)" as RP
+  usecase "Usar la marca/modelo\nlimpios que propone" as MM
+  usecase "Consultar en segundo plano\n(grupo actual + siguientes)" as BG
+  usecase "CU-17 Pedir propuestas\npara todos los pendientes" as CU17
+  usecase "Cancelar la petición" as CA
+  usecase "CU-18 Aceptar en bloque\n(confianza mínima)" as CU18
+  usecase "Ver consumo\n(consultas y tokens)" as CO
+  usecase "Borrar propuestas\ndel proyecto" as BO
+}
+U --> CU14
+CU14 ..> CU15 : <<include>>
+CU15 ..> E1 : <<include>>
+CU15 ..> E2 : <<include>>
+CU15 <.. E3 : <<extend>>
+CU15 <.. E4 : <<extend>>
+U --> CU16
+CU16 ..> BG : <<include>>
+CU16 <.. RP : <<extend>>
+CU16 <.. MM : <<extend>>
+U --> CU17
+CU17 <.. CA : <<extend>>
+U --> CU18
+U --> CO
+U --> BO
+E3 --> IA
+E4 --> IA
+BG --> IA
+CU17 --> IA
+note bottom of BG
+  A la IA solo se envían nombre, otras formas de
+  escribirlo, marca, modelo, referencia, tipo de activo
+  y número de equipos de cada grupo, más los términos
+  candidatos de los catálogos. Nunca centro ni id.
+end note
+@enduml

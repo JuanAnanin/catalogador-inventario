@@ -1,0 +1,7 @@
+.DS_Store
+*.class
+codigo-fuente/target/
+codigo-fuente/build/
+codigo-fuente/pruebas/clases/
+codigo-fuente/pruebas/trabajo*/
+*.log

@@ -1,0 +1,72 @@
+@startuml
+!include estilo.iuml
+title Revisar un grupo de equipos
+|Usuario|
+|Sistema|
+start
+:Mostrar el grupo (nombre, referencia,
+marca, modelo, nº de equipos, variantes)
+y «Electromedicina» si el tipo es E;
+:Calcular sugerencias con la memoria
+(parecido 0-100 % y color);
+if (¿Modo IA?) then (sí)
+  if (¿Propuesta guardada?) then (sí)
+    :Añadir la propuesta de la IA
+    (confianza y motivo);
+  else (no)
+    :Pedirla en segundo plano
+    (con los siguientes de la cola);
+  endif
+else (no)
+endif
+:Elegir el catálogo del buscador
+(asignación › sugerencia › E = GMDN › Mantenimiento);
+:Buscar el nombre del equipo
+en el catálogo elegido;
+|Usuario|
+if (¿La sugerencia o la propuesta de la IA es correcta?) then (sí)
+  :«Aceptar sugerencia» (Ctrl+1)
+  o propuesta de la IA (Ctrl+I);
+else (no)
+  repeat
+    :Escribir en el buscador o
+    cambiar de catálogo (Ctrl+L);
+  repeat while (¿Aparece el término correcto?) is (no)
+  ->sí, o falta en Mantenimiento;
+  if (¿Falta en el catálogo de Mantenimiento?) then (sí)
+    :«+ Nueva entrada…»: nombre y
+    clasificación (códigos propuestos);
+    |Sistema|
+    :Validar, guardar el catálogo y
+    dejar la entrada seleccionada;
+    |Usuario|
+  else (no)
+  endif
+  if (¿Hay suficiente certeza?) then (no)
+    :Pulsar «Posponer» (Ctrl+P);
+    |Sistema|
+    :Marcar el grupo como POSPUESTO;
+    :Anotar el cambio en el diario;
+    :Pasar al siguiente pendiente;
+    stop
+  else (sí)
+    |Usuario|
+    :Seleccionar el resultado
+    (flechas o clic);
+  endif
+endif
+if (¿Marca/modelo con errores?) then (sí)
+  :Corregirlos (o «usar» lo que
+  propone la IA);
+else (no)
+endif
+:Guardar (Intro);
+|Sistema|
+:Asignar el término al grupo (REVISADO);
+:Aprender: nombre → término
+y marca/modelo → corrección;
+:Anotar el cambio y lo aprendido
+en sus diarios (forzados a disco);
+:Pasar al siguiente pendiente;
+stop
+@enduml

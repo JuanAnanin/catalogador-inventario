@@ -1,0 +1,51 @@
+@startuml
+!include estilo.iuml
+title Secuencia: propuesta de la IA en segundo plano al mostrar un grupo
+autonumber
+participant "VentanaPrincipal\n(hilo de la interfaz)" as VP
+participant "PropuestasGuardadas" as PG
+participant "ExecutorService\n«ia» (1 hilo)" as EX
+participant "AsistenteIA" as AS
+participant "Catalogos" as CA
+participant "Memoria" as ME
+participant "ClienteIA" as CL
+participant "Servicio de IA" as S
+VP -> VP : mostrarGrupo(g)
+VP -> PG : get(g.clave)
+alt ya hay propuesta guardada
+  VP -> VP : Sugerencia.combinar(memoria, IA)\npintarSugerencias() — sin esperar
+end
+VP -> VP : pedirIA(g): lote = g (si falta)\n+ siguientes pendientes sin propuesta (hasta 8)
+note right of VP
+  Si g ya tiene propuesta, solo se pide
+  cuando faltan al menos 4 de los siguientes:
+  la IA va por delante de la persona.
+end note
+VP -> VP : pidiendoIA += claves del lote\n«Consultando a la IA…»
+VP -> EX : submit(tarea)
+activate EX
+EX -> AS : proponer(lote, fecha)
+activate AS
+loop cada grupo del lote
+  AS -> ME : sugerir(nombre, marca, modelo, 3)
+  AS -> CA : buscar(nombre / otras formas, catálogo del tipo, 25)
+  AS -> CA : buscar(cada palabra) (con caché)
+  AS -> AS : hasta 12 candidatos del catálogo principal\n(GMDN si es E) y 6 del otro: c1, c2…
+end
+AS -> CL : completar(INSTRUCCIONES, JSON de grupos y candidatos)
+CL -> S : POST (JSON, temperatura 0, modo JSON)
+S --> CL : {"resultados":[{"id":"g1","eleccion":"c3",\n"confianza":92,"motivo":…,"marca":…}]}
+CL --> AS : texto + tokens
+AS -> AS : Json.extraerObjeto(texto)\nelegido(): el id debe ser un candidato
+opt alguno sin término y con «buscar»
+  AS -> CA : buscar(palabras propuestas por la IA)
+  AS -> CL : completar(…) (segunda vuelta, solo esos grupos)
+end
+AS --> EX : Resultado (propuestas, sin respuesta)
+deactivate AS
+EX -> PG : guardar(propuestas) → ia_propuestas.tsv
+EX -> VP : invokeLater(trasRespuestaIA)
+deactivate EX
+VP -> VP : si el lote incluye el grupo actual:\nrecalcular y pintar sugerencias
+VP -> VP : pintarEstadoIA() · seguir adelantando la cola
+@enduml

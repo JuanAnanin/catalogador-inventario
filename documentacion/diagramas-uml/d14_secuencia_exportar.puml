@@ -1,0 +1,36 @@
+@startuml
+!include estilo.iuml
+title Secuencia: exportar el resultado (un fichero por centro)
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "DialogoExportar" as DE
+participant "Espera" as ES
+participant "Exportador" as EXP
+participant "EscritorXlsx /\nEscritorCsv" as EW
+participant "Sistema de ficheros" as FS
+Usuario -> VP : Archivo → Exportar → Resultado (Ctrl+E)
+VP -> DE : mostrar(proyecto, opciones anteriores)
+activate DE
+DE -> EXP : previsualizar(p, opciones)
+EXP --> DE : ficheros por centro (nombre, nº de equipos)
+Usuario -> DE : formato, contenido, carpeta, nombre → «Exportar»
+DE --> VP : Opciones
+deactivate DE
+VP -> ES : ejecutar("Generando…", "equipos")
+activate ES
+ES -> EXP : exportar(p, opciones, avance)
+EXP -> EXP : repartir equipos por centro\n(en el orden del inventario)
+loop cada centro
+  EXP -> EW : escribir(destino, cabecera, Filas)
+  note right of EW
+    cada fila se genera al escribirla:
+    centro · id (número) · código GMDN
+    (vacío en Mantenimiento) · nombre
+    [· marca · modelo]
+  end note
+  EW -> FS : fichero temporal → mover a\n<nombre>_<centro>.xlsx / .csv
+end
+deactivate ES
+VP -> Usuario : «Se han creado N ficheros. ¿Abrir la carpeta?»
+@enduml

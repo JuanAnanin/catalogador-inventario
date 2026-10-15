@@ -1,0 +1,38 @@
+@startuml
+!include estilo.iuml
+title Actividad: lectura del inventario fila a fila
+start
+:Buscar en las 30 primeras filas de cada hoja
+la fila con «Equipo_nombre» y localizar
+las demás columnas por su cabecera;
+if (¿Cabeceras encontradas?) then (sí)
+  :Mostrar columnas encontradas
+  y pedir confirmación;
+else (no)
+  :El usuario elige hoja, fila de títulos
+  y columnas viendo las primeras filas;
+endif
+repeat
+  :Leer la fila siguiente (StAX / CSV en flujo);
+  if (¿Fila vacía (sin centro, id ni nombre)?) then (sí)
+  else (no)
+    :filas leídas + 1;
+    if (Equipo_debaja) then (S)
+      :de baja + 1;
+    elseif () then (N)
+      :guardar centro, id, nombre, referencia,
+      marca, modelo y tipo (textos compartidos);
+    else (otro valor)
+      :otros valores + 1;
+    endif
+  endif
+  :cada 5.000 filas: informar del avance;
+repeat while (¿Quedan filas?) is (sí)
+->no;
+:Agrupar (clave = nombre | marca | modelo | tipo)
+y ordenar de más a menos equipos;
+:Guardar inventario.tsv (una vez) y estado.tsv;
+:Mostrar resumen: leídas, bajas, otros,
+equipos, grupos y centros;
+stop
+@enduml

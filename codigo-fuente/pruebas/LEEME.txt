@@ -1,0 +1,51 @@
+﻿Pruebas automáticas del Catalogador 3.1
+=======================================
+Son las que se usaron para verificar los requisitos: sus entradas y resultados están en el
+capítulo «Verificación» de documentacion/01_Especificacion_de_Requisitos_ERS.pdf.
+No forman parte del programa. Hace falta el JDK 11 o superior (javac); para PruebaIA, Python 3.
+
+FORMA RÁPIDA
+  Windows ........ doble clic en ejecutar_pruebas.bat   (o «ejecutar_pruebas.bat rapido»)
+                   PruebaIA: en otra ventana  «python mock_ia.py 18080 trabajo_mock.log»
+                   y después  «ejecutar_pruebas.bat ia»
+  macOS / Linux .. ./ejecutar_pruebas.sh               (o «./ejecutar_pruebas.sh rapido»)
+                   ejecuta también PruebaIA si hay python3
+  Rendimiento .... «ejecutar_pruebas.bat rendimiento» o «./ejecutar_pruebas.sh rendimiento»
+Deben terminar con «TODO OK (57 comprobaciones)» y «TODO OK (99 comprobaciones)»
+(55 con «rapido», que no lee el inventario de 600.000 filas).
+
+QUÉ HAY
+  src/catalogador/ui/PruebaRequisitos.java
+      57 comprobaciones de los requisitos con los Excel recibidos (incluido el inventario
+      recibido catalogado de principio a fin y comparado fila a fila con lo esperado), el
+      paquete de pruebas de la carpeta «datos» y el inventario de 600.000 filas.
+  src/PruebaIA.java
+      99 comprobaciones del modo IA contra mock_ia.py, un servidor que reproduce la API y el
+      comportamiento documentado de cada servicio (OpenAI, Gemini, Anthropic, Groq, Mistral,
+      DeepSeek, OpenRouter, Cerebras, Cohere, xAI, Hugging Face, LM Studio y Ollama con diez
+      modelos) y sus errores. No gasta consultas reales ni necesita claves.
+  src/Rendimiento.java
+      Mide cada paso con un inventario grande y compara el resultado exportado con el esperado.
+  src/catalogador/ui/CapturasManual.java, src/PrepararDatos.java
+      Recorren la aplicación como una persona y hacen las capturas del manual (necesitan
+      pantalla; se compilan sin --release y con --add-exports java.desktop/sun.font=ALL-UNNAMED).
+  mock_ia.py
+      Servidor de IA simulado:  python3 mock_ia.py puerto [registro] [retardo_segundos]
+      Con la clave «mal» responde 401, «sinsaldo» 402, «cuota» 429 por día, «lento429» pide
+      esperar, «fallo500» falla 1 de cada 3 consultas… (ver el comentario del principio).
+  datos/
+      Catalogos_PRUEBA.xlsx                el catálogo recibido + 6 términos GMDN de prueba
+      Inventario_PRUEBA_casos.xlsx y .csv  51 filas con todos los casos (bajas, otros valores,
+                                           electromedicina, nombres escritos de varias formas…)
+      Inventario_PRUEBA_otros_titulos.xlsx el mismo con otros títulos de columna
+      Resultado_anterior_PRUEBA.xlsx       un resultado anterior con un equipo inexistente y un
+                                           grupo en conflicto
+
+A MANO (desde esta carpeta; en Windows, «;» en lugar de «:» en -cp)
+  javac --release 11 -encoding UTF-8 -d clases/app -sourcepath ../src/main/java ../src/main/java/catalogador/Main.java
+  javac --release 11 -encoding UTF-8 -cp clases/app -d clases/pruebas src/catalogador/ui/PruebaRequisitos.java src/PruebaIA.java src/Rendimiento.java src/PrepararDatos.java
+  java -cp clases/app:clases/pruebas catalogador.ui.PruebaRequisitos ../../ejemplos trabajo --datos=datos [--sin-600k]
+  java -cp clases/app:clases/pruebas PruebaIA datos/Catalogos_PRUEBA.xlsx datos/Inventario_PRUEBA_casos.xlsx 18080 trabajo_mock.log
+  java -Xmx4g -cp clases/app:clases/pruebas Rendimiento ../../ejemplos/grandes/CATALOGO_GRANDE_GMDN_30000.xlsx \
+       ../../ejemplos/grandes/INVENTARIO_GRANDE_650000.xlsx ../../ejemplos/grandes/RESULTADO_ESPERADO_GRANDE_650000.xlsx trabajo_rendimiento
+Las carpetas «clases» y «trabajo…» se crean al ejecutarlas y se pueden borrar.

@@ -1,0 +1,16 @@
+@startuml
+!include estilo.iuml
+title Diagrama de estados de un Grupo de equipos
+left to right direction
+[*] --> Pendiente : importar\ninventario
+state Pendiente
+state Revisado : catálogo, código y nombre\noficial asignados;\nmarca/modelo corregidos
+state "Pospuesto (duda)" as Pospuesto : sin asignación;\nmarca/modelo corregidos\nse conservan
+Pendiente --> Revisado : guardar /\naceptar sugerencia /\naplicar resultado anterior
+Pendiente --> Pospuesto : posponer
+Pospuesto --> Revisado : guardar /\naceptar sugerencia
+Revisado --> Revisado : guardar de nuevo\n(cambiar término,\nmarca o modelo)
+Revisado --> Pospuesto : posponer\n/ se borra la asignación
+Revisado --> Pendiente : devolver a pendiente\n/ memoria.olvidar()
+Pospuesto --> Pendiente : devolver\na pendiente
+@enduml

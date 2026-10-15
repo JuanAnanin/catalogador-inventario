@@ -1,0 +1,77 @@
+@startuml
+!include estilo.iuml
+title Arquitectura en capas: paquetes y dependencias
+package "catalogador" {
+  component "Main" as M
+  package "ui  (presentación · Swing)" as UI {
+    component "VentanaPrincipal" as VP
+    component "DialogoModo\nDialogoEntradaMantenimiento\nDialogoExportar · DialogoImportacion" as DI
+    component "PanelBienvenida, Tablas,\nEspera, Estilo, Chip,\nInsigniaSimilitud, CampoTexto" as UIo
+  }
+  package "ia  (modo IA)" as IAp {
+    component "ConfigIA · ProveedorIA" as CFG
+    component "AsistenteIA\n(candidatos y consulta)" as AS
+    component "ClienteIA · Certificados\n(HTTP: OpenAI / Anthropic / Ollama)" as CL
+    component "PropuestaIA ·\nPropuestasGuardadas" as PG
+  }
+  package "logica  (reglas de negocio)" as LO {
+    component "ImportadorInventario\nImportadorCatalogos\nImportadorResultados" as IM
+    component "Catalogos\n(buscador y\nmantenimiento)" as CA
+    component "Memoria · Huella\n· Sugerencia" as ME
+    component "Almacen\n(persistencia)" as AL
+    component "Exportador\nExportadorCatalogo" as EX
+  }
+  package "modelo  (entidades)" as MO {
+    component "Proyecto · Grupo · Variantes\nTerminoOficial · TipoLista\nEstadoGrupo" as MOc
+  }
+  package "excel  (formatos de fichero)" as XL {
+    component "LectorTablas · Hoja\n(lectura en flujo)" as LT
+    component "EscritorXlsx\nEscritorCsv" as EW
+  }
+  package "util" as UT {
+    component "Texto · Tsv · Diario · Json" as TX
+  }
+}
+package "Java SE 11+ (sin librerías externas)" as JSE {
+  component "javax.swing / java.awt" as SW
+  component "javax.xml.stream (StAX)" as STAX
+  component "java.util.zip" as ZIP
+  component "java.nio (ficheros, canales)" as NIO
+  component "java.net.http\n(HttpClient)" as HTTP
+}
+M --> VP
+VP --> DI
+VP --> UIo
+VP --> IM
+VP --> CA
+VP --> ME
+VP --> AL
+VP --> EX
+VP --> CFG
+VP --> AS
+VP --> PG
+DI --> CFG
+DI --> CL
+AS --> CL
+AS --> CA
+AS --> ME
+CL --> TX
+PG --> TX
+IM --> LT
+IM --> MOc
+CA --> MOc
+ME --> MOc
+AL --> MOc
+EX --> MOc
+EX --> EW
+CA --> TX
+ME --> TX
+AL --> TX
+MOc --> TX
+UI ..> SW
+LT ..> STAX
+LT ..> ZIP
+EW ..> ZIP
+TX ..> NIO
+CL ..> HTTP
+@enduml

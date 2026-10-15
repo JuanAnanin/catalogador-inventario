@@ -1,0 +1,58 @@
+@startuml
+!include estilo.iuml
+left to right direction
+skinparam packageStyle rectangle
+actor "Persona que cataloga" as U
+actor "Responsable\ndel inventario" as R
+actor "Servicio de IA\n(externo o local)" as IA <<sistema>>
+rectangle "Catalogador de inventario" {
+  usecase "CU-01\nImportar catálogos\n(GMDN + Mantenimiento)" as CU01
+  usecase "CU-02\nCrear proyecto desde\nun inventario\n(descarta las bajas)" as CU02
+  usecase "CU-03\nAbrir proyecto guardado" as CU03
+  usecase "CU-04\nRevisar grupo\nde equipos" as CU04
+  usecase "CU-05\nAceptar sugerencia\nautomática" as CU05
+  usecase "CU-06\nBuscar en un catálogo\n(GMDN o Mantenimiento)" as CU06
+  usecase "CU-07\nCrear entrada de\nmantenimiento" as CU07
+  usecase "CU-08\nCorregir marca\ny modelo" as CU08
+  usecase "CU-09\nPosponer grupo\n(dejar como duda)" as CU09
+  usecase "CU-10\nNavegar por la cola" as CU10
+  usecase "CU-11\nExportar resultado\n(un fichero por centro)" as CU11
+  usecase "CU-12\nExportar catálogos\nactualizados" as CU12
+  usecase "CU-13\nImportar clasificaciones\nanteriores" as CU13
+  usecase "CU-14\nElegir modo de trabajo\n(manual o IA)" as CU14
+  usecase "CU-15\nConfigurar servicio de IA\n(clave API, modelo, prueba)" as CU15
+  usecase "CU-16\nRevisar la propuesta\nde la IA" as CU16
+  usecase "CU-17\nPedir propuestas para\ntodos los pendientes" as CU17
+  usecase "CU-18\nAceptar en bloque las\npropuestas seguras" as CU18
+  usecase "Guardar\nautomáticamente" as GA
+  usecase "Aprender\nclasificación" as AP
+}
+U --> CU14
+U --> CU01
+U --> CU02
+U --> CU03
+U --> CU10
+U --> CU04
+U --> CU13
+U --> CU11
+U --> CU17
+U --> CU18
+R --> CU07
+R --> CU12
+R --> CU11
+R --> CU15
+CU14 ..> CU15 : <<include>>\n(modo IA)
+CU04 <.. CU05 : <<extend>>
+CU04 <.. CU06 : <<extend>>
+CU06 <.. CU07 : <<extend>>
+CU04 <.. CU08 : <<extend>>
+CU04 <.. CU09 : <<extend>>
+CU04 <.. CU16 : <<extend>>\n[modo IA]
+CU04 ..> AP : <<include>>
+CU04 ..> GA : <<include>>
+CU13 ..> AP : <<include>>
+CU18 ..> GA : <<include>>
+CU16 --> IA
+CU17 --> IA
+CU15 --> IA
+@enduml

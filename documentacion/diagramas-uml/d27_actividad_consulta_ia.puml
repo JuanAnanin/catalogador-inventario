@@ -1,0 +1,75 @@
+@startuml
+!include estilo.iuml
+title Actividad: cómo se pide a la IA el término de un lote de grupos
+start
+:Lote de grupos sin propuesta
+(8; 4 con Groq, Ollama y LM Studio);
+partition "Candidatos (en el ordenador)" {
+  :Para cada grupo, sugerencias de la memoria;
+  :Buscar el nombre y sus otras formas en el
+  catálogo principal (GMDN si es E; si no,
+  Mantenimiento) y en el otro;
+  :Buscar cada palabra suelta (≥ 4 letras),
+  con caché;
+  :Quedarse con 12 + 6 candidatos
+  numerados c1, c2…;
+}
+partition "Consulta" {
+  :Componer instrucciones + JSON
+  (nombre, otras formas, marca, modelo,
+  referencia, tipo, unidades, candidatos);
+  if (¿Más tokens estimados que el límite\ndel servicio, o más grupos que\nel máximo aprendido?) then (sí)
+    :Partir el lote en dos y
+    consultar cada mitad;
+  else (no)
+  endif
+  :Enviar al servicio con sus opciones
+  (salida estructurada o modo JSON,
+  razonamiento mínimo, límite de salida ·
+  en Ollama: contexto, think, format);
+  if (¿Rechaza una opción?) then (sí)
+    :Quitarla y repetir;
+  else (no)
+  endif
+  if (¿Demasiado grande o\nrespuesta cortada?) then (sí)
+    :Partir el lote y recordar
+    el tamaño que funciona;
+  else (no)
+  endif
+  if (¿Error?) then (sí)
+    if (¿Clave, saldo, cuota,\nmodelo o red?) then (sí)
+      :IA en pausa con el mensaje;
+      stop
+    else (no)
+      :Marcar los grupos con el error
+      (Ctrl+Mayús+I para reintentar);
+      stop
+    endif
+  else (no)
+  endif
+  :Extraer el objeto JSON
+  (quitando <think>…</think> y ```json```);
+}
+partition "Validación" {
+  repeat :Siguiente resultado;
+    if (¿«eleccion» es un candidato\n(id, código o nombre)?) then (sí)
+      :Propuesta con término, confianza
+      (0-100) y motivo;
+      :Marca/modelo limpios solo si
+      son distintos del original;
+    else (no)
+      if (¿Trae palabras en «buscar»?) then (sí)
+        :Buscar esas palabras y
+        preguntar otra vez (una sola);
+      else (no)
+        :Propuesta «sin término»
+        con el motivo;
+      endif
+    endif
+  repeat while (¿Quedan resultados?) is (sí)
+}
+:Grupos que la IA no contestó:
+quedan para pedirlos otra vez;
+:Guardar en ia_propuestas.tsv;
+stop
+@enduml

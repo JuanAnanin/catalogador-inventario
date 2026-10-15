@@ -1,0 +1,178 @@
+@startuml
+!include estilo.iuml
+title Paquete ia (modo IA)
+class ProveedorIA {
+  + {static} TODOS : List<ProveedorIA>
+  - id, nombre : String
+  - categoria : Categoria
+  - protocolo : Protocolo
+  - formatoJson : FormatoJson
+  - urlBase : String
+  - modelos : List<String>
+  - urlClave, nota : String
+  - pasos : List<String>
+  - necesitaClave, local : boolean
+  - variableEntorno, grupoClave : String
+  - limiteEntrada, loteRecomendado : int
+  --
+  + {static} porId(id) : ProveedorIA
+  + {static} deCategoria(c) : List<ProveedorIA>
+  + getPasos() : List<String>
+  + getNombreCorto() / getModeloPorDefecto()
+  + urlEditable() : boolean
+}
+enum "ProveedorIA.Categoria" as Cat {
+  GRATUITA
+  CON_VERSION_GRATUITA
+  DE_PAGO
+  PERSONALIZADA
+}
+enum "ProveedorIA.Protocolo" as Prot {
+  OPENAI
+  ANTHROPIC
+  OLLAMA
+}
+enum "ProveedorIA.FormatoJson" as FJ {
+  ESQUEMA
+  OBJETO
+  NINGUNO
+}
+class ConfigIA {
+  + {static} LOTE_POR_DEFECTO = 8
+  + {static} UMBRAL_BLOQUE_POR_DEFECTO = 90
+  - fichero : Path  (ia.properties)
+  --
+  + recargar() / guardar()
+  + getModo() / setModo(m)
+  + isPreguntarAlEmpezar() / esPrimeraVez()
+  + getProveedor() / setProveedor(p)
+  + getClave(p) : String  (o variable de entorno)
+  + getModelo(p) / getUrl(p)
+  + estaListo(p) : boolean
+  + getLote(p) / getUmbralBloque()
+  + resumen() : String
+}
+enum "ConfigIA.Modo" as Modo {
+  MANUAL
+  IA
+}
+class ClienteIA {
+  - proveedor : ProveedorIA
+  - url, clave, modelo : String
+  - http : HttpClient
+  - quitados : Set<String>
+  - infoOllama : InfoOllama
+  - tokensEntrada, tokensSalida, consultas : AtomicLong
+  --
+  + {static} desde(cfg, p) : ClienteIA
+  + modelos() : List<String>
+  + completar(sistema, usuario, esquema, maxSalida) : Respuesta
+  + probar() : String
+  + getParametrosQuitados() : Set<String>
+  + {static} limpiarPensamiento(texto) : String
+  - cuerpoOpenAI(...) / cuerpoAnthropic(...) / cuerpoOllama(...)
+  - extrasRazonamiento() : Map
+  ~ infoOllama() : InfoOllama
+  ~ {static} valorThink(info) : Object
+  ~ {static} parametroRechazado(texto, enviados) : String
+  ~ {static} jsonCompleto(texto) : boolean
+  ~ clasificar(estado, cuerpo, retryAfter) : ErrorIA
+}
+class "ClienteIA.InfoOllama" as IO {
+  ~ capacidades : List<String>
+  ~ valoresThink : List<Object>
+  ~ nivelesThink : boolean
+  ~ contexto : int
+}
+class Certificados {
+  ~ {static} contexto() : SSLContext
+  (Java + Windows-ROOT / llavero de macOS)
+}
+class "ClienteIA.Respuesta" as Resp {
+  - texto : String
+  - tokensEntrada, tokensSalida, milisegundos : long
+  - cortada : boolean
+}
+class "ClienteIA.ErrorIA" as Err <<IOException>> {
+  - tipo : Tipo
+  - estado : int
+  - esperaSegundos : long
+  + detieneLaIA() : boolean
+}
+enum "ErrorIA.Tipo" as Tipo {
+  CLAVE · SALDO · CUOTA · MODELO
+  PETICION · DEMASIADO_GRANDE · LIMITE
+  SERVIDOR · RED · RESPUESTA · CANCELADO
+}
+class AsistenteIA {
+  ~ {static} INSTRUCCIONES : String
+  + {static} ESQUEMA : Map
+  ~ {static} CANDIDATOS_PRINCIPAL = 12
+  ~ {static} CANDIDATOS_SECUNDARIO = 6
+  ~ {static} SALIDA_POR_GRUPO = 220
+  - cliente : ClienteIA
+  - loteMaximo : int
+  --
+  + proponer(grupos, fecha) : Resultado
+  ~ candidatos(g, palabrasExtra, ya) : List<Candidato>
+  - consultar(cands, res) : Map<Grupo,Map>
+  - partir(cands, res) : Map<Grupo,Map>
+  ~ estimarTokens(cands, compacto) : int
+  ~ {static} esDemasiadoGrande(e) : boolean
+}
+class "AsistenteIA.Candidato" as Cand {
+  ~ id : String  («c1», «c2»…)
+  ~ termino : TerminoOficial
+}
+class "AsistenteIA.Resultado" as Res {
+  - propuestas : List<PropuestaIA>
+  - sinRespuesta : List<Grupo>
+  - consultas : int
+}
+class PropuestaIA {
+  - claveGrupo : String
+  - lista : TipoLista
+  - codigo, nombreOficial : String
+  - confianza : int  (0-100)
+  - motivo, marca, modelo : String
+  - fuente, fecha : String
+  + tieneTermino() : boolean
+}
+class PropuestasGuardadas {
+  + {static} FICHERO = "ia_propuestas.tsv"
+  + cargar() / guardar(nuevas)
+  + get(clave) / olvidar(clave) / borrarTodas()
+}
+ProveedorIA --> Cat
+ProveedorIA --> Prot
+ProveedorIA --> FJ
+ConfigIA --> Modo
+ConfigIA ..> ProveedorIA
+ClienteIA --> "1" ProveedorIA
+ClienteIA --> "0..1" IO
+ClienteIA ..> Certificados
+ClienteIA ..> Resp : devuelve
+ClienteIA ..> Err : lanza
+Err --> Tipo
+AsistenteIA --> "1" ClienteIA
+AsistenteIA ..> Cand : crea
+AsistenteIA ..> Res : devuelve
+Res o-- "0..*" PropuestaIA
+PropuestasGuardadas *-- "0..*" PropuestaIA
+AsistenteIA ..> Catalogos
+AsistenteIA ..> Memoria
+class Catalogos
+class Memoria
+note bottom of AsistenteIA
+  La IA solo puede elegir un candidato (id) de los que
+  le envía el programa: nunca inventa términos ni códigos.
+  Si la consulta no cabe, se parte en dos (y se recuerda);
+  si ninguno encaja, se pregunta otra vez con las palabras
+  que propone la IA («buscar»).
+end note
+note bottom of ClienteIA
+  Un formato por protocolo (OpenAI, Anthropic, Ollama) y, en cada
+  servicio, solo las opciones que admite. Si el servicio rechaza
+  una opción (400), se añade a «quitados» y se repite.
+end note
+@enduml

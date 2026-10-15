@@ -1,0 +1,54 @@
+@startuml
+!include estilo.iuml
+title Secuencia: una consulta a la IA, adaptada al servicio, con reintentos y errores (ClienteIA.completar)
+autonumber
+participant "AsistenteIA" as AS
+participant "ClienteIA" as CL
+participant "HttpClient" as H
+participant "Servicio de IA" as S
+AS -> CL : completar(sistema, usuario, esquema, maxSalida)
+opt Ollama, primera consulta con ese modelo
+  CL -> S : POST /api/show
+  S --> CL : capacidades, familia, plantilla, contexto
+end
+loop hasta 4 reintentos (y hasta 10 ajustes de opciones)
+  CL -> CL : cuerpo según el protocolo:\nOpenAI /chat/completions (Bearer)\nAnthropic /messages (x-api-key, anthropic-version)\nOllama /api/chat (format, think, num_ctx…)\nsin las opciones ya «quitadas»
+  CL -> H : send(petición)\n(proxy del sistema, salvo direcciones locales;\ncertificados de Java + sistema)
+  H -> S
+  alt 2xx
+    S --> CL : JSON
+    CL -> CL : leer texto y tokens;\nvacía con think=false (Ollama) → repetir con «low»;\nvacía → repetir una vez
+    alt respuesta cortada y JSON incompleto
+      CL --> AS : ErrorIA(DEMASIADO_GRANDE)
+    else
+      CL --> AS : Respuesta
+    end
+  else 400/422 que cita una opción enviada\n(temperature, response_format, reasoning_effort, think, system…)
+    CL -> CL : quitados += opción · repetir
+  else 429 por minuto (Retry-After, retryDelay, «try again in Ns» ≤ 90 s)
+    CL -> CL : esperar lo indicado\n(o 2, 4, 8, 16 s) · repetir
+  else 500 / 503 / 529 / 408 / tiempo agotado
+    CL -> CL : esperar y repetir
+  else 413 o contexto excedido
+    CL --> AS : ErrorIA(DEMASIADO_GRANDE)
+  else 401 / 403
+    CL --> AS : ErrorIA(CLAVE)
+  else 402 o «insufficient balance»
+    CL --> AS : ErrorIA(SALDO)
+  else 429 diario, espera > 90 s o límite de gasto
+    CL --> AS : ErrorIA(CUOTA) «se podrá seguir dentro de…»
+  else 404 / 400 sobre el modelo
+    CL --> AS : ErrorIA(MODELO) (en Ollama: «ollama pull …»)
+  else sin conexión o certificado no reconocido
+    CL --> AS : ErrorIA(RED)
+  end
+end
+opt ErrorIA(DEMASIADO_GRANDE)
+  AS -> AS : partir el lote en dos, recordar el tamaño\ny consultar cada mitad
+end
+note over AS, CL
+  CLAVE, SALDO, CUOTA, MODELO y RED ponen la IA «en pausa»
+  (no tiene sentido seguir hasta cambiar la configuración).
+  El resto solo marca con error los grupos de esa consulta.
+end note
+@enduml

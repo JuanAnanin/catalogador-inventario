@@ -1,0 +1,118 @@
+@startuml
+!include estilo.iuml
+title Paquete ui (presentación)
+class JFrame <<Swing>>
+class JDialog <<Swing>>
+class JPanel <<Swing>>
+class AbstractTableModel <<Swing>>
+class DefaultTableCellRenderer <<Swing>>
+hide <<Swing>> members
+class Main {
+  + {static} main(args) : void
+}
+class VentanaPrincipal {
+  - almacen : Almacen
+  - catalogos : Catalogos
+  - memoria : Memoria
+  - proyecto : Proyecto
+  - actual : Grupo
+  - listaBuscador : TipoLista
+  - historial : Deque<Grupo>
+  - sugerencias : List<Sugerencia>
+  - hiloBusqueda : ExecutorService
+  - generacion : AtomicInteger
+  - configIA : ConfigIA
+  - asistente : AsistenteIA
+  - propuestas : PropuestasGuardadas
+  - hiloIA : ExecutorService
+  - pidiendoIA : Set<String>
+  - pausaIA : String
+  --
+  + iniciar() : void
+  - mostrarGrupo(g, recordar) : void
+  - cambiarLista(lista, aMano) : void
+  - lanzarBusqueda() : void
+  - guardar() / aceptarSugerencia(i) / posponer()
+  - asignar(lista, codigo, nombre, origen) : void
+  - persistir(g : Grupo) : boolean
+  - importarInventario(f) / importarCatalogos(f)
+  - importarResultadoAnterior() : void
+  - nuevaEntradaMantenimiento() : void
+  - exportar() / exportarCatalogos()
+  - abrirModo() / prepararIA()
+  - calcularSugerencias(g) : List<Sugerencia>
+  - pedirIA(g) / enviarIA(lote)
+  - trasRespuestaIA(...)
+  - aceptarPropuestaIA() / repreguntarIA()
+  - pedirTodasIA() / aceptarEnBloqueIA()
+}
+class DialogoModo {
+  - cfg : ConfigIA
+  - elegido : ProveedorIA
+  ~ {static} mostrar(padre, cfg, alEmpezar) : boolean
+  - elegirModo(ia) / elegirProveedor(p)
+  - cargarModelos() / probar()
+  - aceptar() : void
+}
+class DialogoEntradaMantenimiento {
+  - combos : JComboBox[5]
+  - txtCodigo, txtNombreNivel : JTextField[5]
+  ~ {static} crear(padre, catalogos, nombre) : TerminoOficial
+  ~ {static} modificar(padre, catalogos, t) : TerminoOficial
+  - rellenar(nivel) : void
+  - aceptar() : void
+}
+class DialogoExportar {
+  ~ {static} mostrar(padre, proyecto, previas) : Opciones
+  - refrescarVista() : void
+}
+class DialogoImportacion {
+  ~ mostrar() : boolean
+  ~ columna(idCampo) : int
+  ~ setVistaPrevia(v) : void
+}
+class PanelBienvenida
+class "Tablas.ModeloCola" as MC
+class "Tablas.ModeloResultados" as MR {
+  ~ setLista(lista) : boolean
+}
+class "Tablas.RenderResultados" as RR
+class Espera <<utilidad>> {
+  ~ {static} ejecutar(padre, mensaje, unidad, tarea, alTerminar)
+  ~ {static} ejecutarCancelable(...)
+}
+class "Espera.Avance" as AV
+class InsigniaSimilitud <<JComponent>>
+class Chip <<JLabel>>
+class CampoTexto <<JTextField>>
+class Estilo <<utilidad>>
+interface "LectorTablas.Progreso" as Pro
+JFrame <|-- VentanaPrincipal
+JDialog <|-- DialogoEntradaMantenimiento
+JDialog <|-- DialogoExportar
+JDialog <|-- DialogoImportacion
+JDialog <|-- DialogoModo
+JPanel <|-- PanelBienvenida
+AbstractTableModel <|-- MC
+AbstractTableModel <|-- MR
+DefaultTableCellRenderer <|-- RR
+Pro <|.. AV
+Main ..> VentanaPrincipal : crea
+VentanaPrincipal *-- PanelBienvenida
+VentanaPrincipal *-- MC
+VentanaPrincipal *-- MR
+VentanaPrincipal *-- InsigniaSimilitud
+VentanaPrincipal *-- "2" Chip : estado,\nelectromedicina
+VentanaPrincipal *-- CampoTexto
+VentanaPrincipal ..> DialogoEntradaMantenimiento
+VentanaPrincipal ..> DialogoExportar
+VentanaPrincipal ..> DialogoImportacion
+VentanaPrincipal ..> DialogoModo
+VentanaPrincipal ..> Espera
+Espera ..> AV : crea
+VentanaPrincipal ..> Estilo
+MC -[hidden]down- InsigniaSimilitud
+MR -[hidden]down- Chip
+RR -[hidden]down- CampoTexto
+DialogoImportacion -[hidden]down- Espera
+@enduml

@@ -1,0 +1,40 @@
+@startuml
+!include estilo.iuml
+title Secuencia: búsqueda «según se escribe» en el catálogo elegido
+autonumber
+actor Usuario
+box "Hilo de la interfaz (EDT)" #F7F9FC
+participant "CampoTexto\n(txtBuscar)" as TB
+participant "Timer\n(110 ms)" as TI
+participant "VentanaPrincipal" as VP
+end box
+box "Hilo de búsqueda (segundo plano)" #FFF8EE
+participant "ExecutorService" as EX
+participant "Catalogos" as CA
+end box
+opt ⌘L / botón GMDN o Mantenimiento
+  Usuario -> VP : cambiarLista(otra, true)
+  VP -> VP : listaBuscador = otra\ncolumnas de la tabla según el catálogo
+end
+Usuario -> TB : teclea «amalgama»
+TB -> TI : DocumentListener → restart()
+note over TI : cada tecla reinicia la espera;\nsolo se busca al parar de escribir
+TI -> VP : lanzarBusqueda()
+VP -> VP : gen = generacion.incrementAndGet()
+VP -> EX : submit(tarea)
+EX -> CA : buscar(consulta, listaBuscador, enDescripcion, 300)
+activate CA
+loop cada término del catálogo elegido
+  CA -> CA : puntuar(palabra, término, conCodigo)\n(exacta · prefijo · contiene · errata · código GMDN)
+end
+CA -> CA : ordenar por puntos
+CA --> EX : Busqueda(resultados, total)
+deactivate CA
+EX -> VP : SwingUtilities.invokeLater(...)
+alt gen == generacion.get()
+  VP -> VP : mostrarResultados(b, consulta, autoSel)
+  VP -> VP : actualizarSeleccion()\n(descripción GMDN o clasificación\nde Mantenimiento + «Se asignará…»)
+else hay una búsqueda más reciente
+  VP -> VP : se descarta (resultado obsoleto)
+end
+@enduml

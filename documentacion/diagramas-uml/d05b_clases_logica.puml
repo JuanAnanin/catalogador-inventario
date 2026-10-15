@@ -1,0 +1,110 @@
+@startuml
+!include estilo.iuml
+title Paquete logica (2/2): memoria, persistencia y resultado
+class Memoria {
+  + {static} MINIMO = 0.45
+  ~ {static} ESCANEO_COMPLETO = 5000
+  ~ {static} CANDIDATOS = 400
+  ~ {static} COMPACTAR = 5000
+  - fichero : Path
+  - diario : Diario
+  - entradas : List<Entrada>
+  - porClave : Map<String,Integer>
+  - indice : Map<Integer,Enteros>
+  - marcas, modelos : Map<String,String>
+  - pendientes : List<String>
+  --
+  + cargar() : void
+  + guardarCambios() : void
+  + compactar() : void
+  + aprender(nombre, marca, modelo, lista, codigo, nombreOficial, fecha) : void
+  + olvidar(nombre, marca, modelo) : void
+  + aprenderMarca(original, corregida) : void
+  + aprenderModelo(original, corregido) : void
+  + marcaConocida(original) : String
+  + sugerir(nombre, marca, modelo, max) : List<Sugerencia>
+  - candidatos(h : Huella) : int[]
+}
+class "Memoria.Entrada" as Entrada {
+  - nombre, marca, modelo : String
+  - lista : TipoLista
+  - codigo, nombreOficial, fecha : String
+  - huella : Huella
+}
+class Huella {
+  - normalizado : String
+  - palabras : String[]
+  - trigramas : int[]
+  + similitud(otra : Huella) : double
+  + getTrigramas() : int[]
+  ~ {static} dice(a : int[], b : int[]) : double
+  ~ {static} parecido(x, y) : double
+}
+class Sugerencia {
+  + {static} UMBRAL_VERDE = 0.85
+  + {static} UMBRAL_NARANJA = 0.65
+  - lista : TipoLista
+  - codigo, nombreOficial : String
+  - similitud : double
+  - origen : Origen
+  - motivo, fuente : String
+  + porcentaje() : int
+  + esDeIA() : boolean
+  + {static} deIA(lista, codigo, nombre, confianza,\n   motivo, fuente) : Sugerencia
+  + {static} combinar(memoria : List, ia, max) : List
+  + {static} color(similitud) : Color
+  + {static} nivel(similitud) : String
+}
+enum "Sugerencia.Origen" as Origen {
+  MEMORIA
+  IA
+  MEMORIA_E_IA
+}
+class Almacen {
+  ~ {static} COMPACTAR_ESTADO = 2000
+  - base : Path
+  --
+  + prepararCarpetas() : void
+  + bloquearInstancia() : boolean
+  + nuevaCarpetaProyecto(nombre) : Path
+  + guardarInventario(p) : void
+  + registrarCambio(p, g) : void
+  + registrarCambios(p, grupos) : void
+  + guardarEstado(p) : void
+  + abrir(carpeta, progreso) : Proyecto
+  + listarProyectos() : List<InfoProyecto>
+  + leerConfig() / guardarConfig(p)
+}
+class "Almacen.ProyectoAntiguoException" as PAE
+class Exportador <<utilidad>> {
+  + {static} CABECERA : List<String>
+  + {static} previsualizar(p, opciones) : List<Fichero>
+  + {static} exportar(p, opciones, progreso) : List<Fichero>
+  + {static} nombreFichero(prefijo, centro, ext) : String
+  + {static} marcaFinal(g, original) : String
+  + {static} modeloFinal(g, original) : String
+}
+class "Exportador.Opciones" as Op {
+  + csv : boolean
+  + incluirSinCatalogar : boolean
+  + incluirMarcaModelo : boolean
+  + carpeta : File
+  + prefijo : String
+}
+class Diario {
+  - fichero : Path
+  + anadir(lineas : List<String>) : void
+  + leer() : List<String>
+  + tamano() : int
+  + vaciar() : void
+}
+Memoria *-- "0..*" Entrada
+Entrada *-- "1" Huella
+Memoria ..> Sugerencia : crea
+Sugerencia --> "0..1" Entrada : basadaEn
+Sugerencia --> Origen
+Memoria --> "1" Diario : memoria.diario.tsv
+Almacen ..> Diario : cambios.tsv
+Almacen ..> PAE : lanza
+Exportador ..> Op
+@enduml

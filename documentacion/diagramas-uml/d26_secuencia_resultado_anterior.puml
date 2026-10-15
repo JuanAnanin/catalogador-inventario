@@ -1,0 +1,39 @@
+@startuml
+!include estilo.iuml
+title Secuencia: aplicar el resultado de una catalogación anterior
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "Espera" as ES
+participant "ImportadorResultados" as IR
+participant "LectorTablas" as LT
+participant "Catalogos" as CA
+participant "Grupo" as G
+participant "Memoria" as ME
+participant "Almacen" as AL
+Usuario -> VP : Archivo → Importar → Resultado de una\ncatalogación anterior (fichero)
+VP -> ES : ejecutar("Aplicando…", "filas")
+activate ES
+ES -> IR : aplicar(f, proyecto, catalogos, memoria, origen, fecha)
+IR -> IR : detectar(): Equipo_codiCentro, Equipo_idEquipo,\nCÓDIGO GMDN y columna de NOMBRE
+IR -> IR : índice centro + id → equipo
+loop cada fila del resultado
+  LT -> IR : fila
+  IR -> CA : porCodigo(GMDN, código) o\nporCodigo(MANTENIMIENTO, nombre)
+  IR -> IR : agrupar la asignación por grupo
+end
+loop cada grupo con asignaciones
+  alt todas iguales
+    IR -> ME : aprender(nombre, marca, modelo → término)
+    alt grupo PENDIENTE
+      IR -> G : asignar(…, origen = «Importado de …»)
+    end
+  else distintas entre sus equipos
+    IR -> IR : gruposEnConflicto++ (no se toca)
+  end
+end
+ES -> AL : registrarCambios(cambiados)
+ES -> ME : guardarCambios()
+deactivate ES
+VP -> Usuario : filas · sin equipo · fuera de catálogo ·\nrevisados · ya revisados · en conflicto · aprendidas
+@enduml

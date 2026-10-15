@@ -1,0 +1,40 @@
+@startuml
+!include estilo.iuml
+title Secuencia: pedir propuestas para todos los pendientes y aceptar en bloque
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "Espera\n(cancelable)" as ES
+participant "AsistenteIA" as AS
+participant "PropuestasGuardadas" as PG
+participant "Almacen" as AL
+participant "Memoria" as ME
+Usuario -> VP : IA → Pedir propuestas para todos…
+VP -> VP : faltan = no revisados sin propuesta\nconsultas ≈ faltan / 8
+VP -> Usuario : «Se pedirá a … para N grupos (M equipos)\nen K consultas… ¿Empezar?»
+Usuario -> VP : Aceptar
+VP -> ES : ejecutarCancelable("Pidiendo propuestas…", "grupos")
+activate ES
+loop cada lote de 8, mientras no se cancele
+  ES -> AS : proponer(lote)
+  AS --> ES : propuestas
+  ES -> PG : guardar(propuestas)
+  ES -> ES : avance(hechos, total)
+  opt error que para la IA o 3 fallos seguidos
+    ES -> ES : terminar y anotar el motivo
+  end
+end
+deactivate ES
+VP -> Usuario : resumen: con término, sin término,\nconsultas, segundos, tokens
+== Aceptar en bloque ==
+Usuario -> VP : IA → Aceptar en bloque las propuestas más seguras…
+VP -> Usuario : confianza mínima (90 %) · «Se aceptarán N grupos»
+Usuario -> VP : Aceptar
+loop cada grupo PENDIENTE con propuesta ≥ umbral\n(y término presente en el catálogo)
+  VP -> VP : g.asignar(…, origen = «IA en bloque: servicio (NN %)»)
+  VP -> ME : aprender(nombre, marca, modelo → término)
+end
+VP -> AL : registrarCambios(proyecto, grupos)
+VP -> ME : guardarCambios()
+VP -> Usuario : «N grupos (M equipos) marcados como revisados»
+@enduml

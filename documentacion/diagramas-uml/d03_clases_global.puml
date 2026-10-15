@@ -1,0 +1,88 @@
+@startuml
+!include estilo.iuml
+title Diagrama de clases (vista general)
+hide empty members
+package ui {
+  class VentanaPrincipal <<JFrame>>
+  class DialogoEntradaMantenimiento <<JDialog>>
+  class DialogoExportar <<JDialog>>
+  class DialogoModo <<JDialog>>
+}
+package ia {
+  class ConfigIA
+  class ProveedorIA
+  class ClienteIA
+  class AsistenteIA
+  class PropuestaIA
+  class PropuestasGuardadas
+}
+package logica {
+  package "importar / exportar" as IE {
+    class ImportadorInventario <<utilidad>>
+    class ImportadorCatalogos <<utilidad>>
+    class ImportadorResultados <<utilidad>>
+    class Exportador <<utilidad>>
+    class ExportadorCatalogo <<utilidad>>
+  }
+  class Catalogos
+  class "Catalogos.Catalogo" as Catalogo
+  class Memoria
+  class "Memoria.Entrada" as Entrada
+  class Huella
+  class Sugerencia
+  class Almacen
+}
+package modelo {
+  class Proyecto
+  class Grupo
+  class Variantes
+  class TerminoOficial
+  enum TipoLista
+  enum EstadoGrupo
+}
+package util {
+  class Diario
+}
+ImportadorInventario -[hidden]down- ImportadorCatalogos
+ImportadorCatalogos -[hidden]down- ImportadorResultados
+ImportadorResultados -[hidden]down- Exportador
+Exportador -[hidden]down- ExportadorCatalogo
+VentanaPrincipal --> "1" Almacen
+VentanaPrincipal --> "1" Catalogos
+VentanaPrincipal --> "1" Memoria
+VentanaPrincipal --> "0..1" Proyecto : proyecto
+VentanaPrincipal --> "0..1" Grupo : actual
+VentanaPrincipal ..> DialogoEntradaMantenimiento : crea
+VentanaPrincipal ..> DialogoExportar : crea
+VentanaPrincipal ..> DialogoModo : crea
+VentanaPrincipal --> "1" ConfigIA
+VentanaPrincipal --> "0..1" AsistenteIA : en modo IA
+VentanaPrincipal --> "0..1" PropuestasGuardadas : del proyecto
+DialogoModo ..> ConfigIA : edita y guarda
+DialogoModo ..> ClienteIA : probar / modelos
+ConfigIA --> ProveedorIA : elegido
+AsistenteIA --> "1" ClienteIA
+AsistenteIA ..> Catalogos : candidatos
+AsistenteIA ..> Memoria : candidatos
+AsistenteIA ..> PropuestaIA : crea
+ClienteIA --> ProveedorIA
+PropuestasGuardadas *-- "0..*" PropuestaIA
+PropuestasGuardadas --> Diario : ia_propuestas.tsv
+PropuestaIA ..> Sugerencia : se muestra como
+VentanaPrincipal ..> IE : usa
+DialogoEntradaMantenimiento ..> Catalogos : añadir /\nmodificar
+Catalogos *-- "0..2" Catalogo
+Catalogo *-- "0..*" TerminoOficial
+TerminoOficial --> TipoLista
+Memoria *-- "0..*" Entrada
+Entrada *-- "1" Huella
+Memoria ..> Sugerencia : crea
+Memoria --> Diario
+Sugerencia --> "1" Entrada : basadaEn
+Proyecto *-- "0..*" Grupo
+Grupo *-- "4" Variantes
+Grupo --> EstadoGrupo
+Grupo --> "0..1" TipoLista
+Almacen ..> Proyecto : guarda / abre
+Almacen ..> Diario : cambios.tsv
+@enduml

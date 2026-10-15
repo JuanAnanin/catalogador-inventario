@@ -1,0 +1,43 @@
+@startuml
+!include estilo.iuml
+title Secuencia: crear un proyecto desde el inventario
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "Espera\n(SwingWorker)" as ES
+participant "ImportadorInventario" as II
+participant "LectorTablas" as LT
+participant "Proyecto" as P
+participant "Almacen" as AL
+Usuario -> VP : Archivo → Importar → Inventario (fichero)
+VP -> ES : ejecutar("Buscando las columnas…")
+activate ES
+ES -> II : detectar(fichero)
+II -> LT : recorrer(f, hoja, receptor) (primeras 30 filas)
+LT --> II : fila de cabeceras
+II --> ES : Mapeo (hoja, fila, columnas)
+deactivate ES
+VP -> Usuario : columnas encontradas · trato de las bajas\n¿separar por marca y modelo?
+Usuario -> VP : «Importar»
+VP -> ES : ejecutar("Leyendo el inventario…", "filas")
+activate ES
+ES -> II : importar(f, mapeo, agrupar, avance)
+loop cada fila del fichero (en flujo)
+  LT -> II : fila(num, celdas)
+  alt Equipo_debaja = "S"
+    II -> II : descartadosBaja++
+  else otro valor distinto de "N"
+    II -> II : descartadosOtros++
+  else "N"
+    II -> P : anadirEquipo(centro, id, nombre,\nreferencia, marca, modelo, tipo)
+  end
+  LT -> ES : avance(filas, total)
+end
+II -> P : setEstadisticas() · terminarCarga()
+II -> P : agrupar()
+P -> P : clave = palabras ordenadas | marca | modelo | tipo\nordenar de más a menos equipos
+ES -> AL : nuevaCarpetaProyecto() · guardarInventario(p)\n· guardarEstado(p)
+deactivate ES
+VP -> VP : abrirProyecto(p) · mostrarGrupo(primer pendiente)
+VP --> Usuario : resumen (leídas, bajas, equipos, grupos, centros)
+@enduml

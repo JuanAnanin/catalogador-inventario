@@ -1,0 +1,59 @@
+@startuml
+!include estilo.iuml
+title Flujo de trabajo completo
+start
+:Abrir Catalogador (lanzador de Windows, macOS o Linux);
+if (¿Preguntar el modo al empezar?) then (sí)
+  :Elegir **modo manual** o **modo IA**;
+  if (¿Modo IA?) then (sí)
+    :Elegir el servicio (gratuito, con versión
+    gratuita o de pago), pegar la clave API
+    y, si se quiere, probar la conexión;
+  else (no)
+  endif
+else (no)
+endif
+if (¿Hay un proyecto abierto anteriormente?) then (sí)
+  :Reabrir el último proyecto
+  (continúa donde se dejó);
+else (no)
+  if (¿Catálogos cargados?) then (no)
+    :Importar el Excel de catálogos
+    (hojas GMDN y Mantenimiento);
+  else (sí)
+  endif
+  :Importar el inventario
+  (cabeceras reconocidas solas);
+  :Descartar equipos de baja (S),
+  agrupar los iguales y ordenar
+  de más a menos equipos;
+endif
+if (¿Modo IA y muchos grupos?) then (sí)
+  :Opcional: pedir propuestas para todos
+  y aceptar en bloque las más seguras;
+else (no)
+endif
+while (¿Quedan grupos pendientes?) is (sí)
+  :Revisar grupo
+  (ver diagrama de revisión);
+  :Guardado automático
+  (una línea en el diario);
+endwhile (no)
+if (¿Hay grupos pospuestos?) then (sí)
+  :Revisar pospuestos (dudas);
+else (no)
+endif
+:Exportar resultado
+(un Excel o CSV por centro);
+if (¿Se crearon entradas de mantenimiento?) then (sí)
+  :Exportar catálogos actualizados
+  (mismo formato que el original);
+else (no)
+endif
+note right
+  Las exportaciones pueden hacerse
+  en cualquier momento, aunque
+  queden grupos pendientes.
+end note
+stop
+@enduml

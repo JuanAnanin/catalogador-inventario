@@ -1,0 +1,127 @@
+@startuml
+!include estilo.iuml
+title Paquete modelo
+class Proyecto {
+  - nombre, ficheroOrigen, creado : String
+  - carpeta : Path
+  - agruparPorMarcaYModelo : boolean
+  - filasLeidas, descartadosBaja, descartadosOtros : long
+  - n : int
+  - centro, id, nombreEq, referencia : String[]
+  - marca, modelo, tipo : String[]
+  - textos : Map<String,String>
+  - grupos : List<Grupo>
+  - gruposPorClave : Map<String,Grupo>
+  - grupoDeFila : Grupo[]
+  --
+  + anadirEquipo(centro, id, nombre, referencia, marca, modelo, tipo) : void
+  + terminarCarga() : void
+  + agrupar() : void
+  + contar(e : EstadoGrupo) : int
+  + equiposTotales() : long
+  + equipos(e : EstadoGrupo) : long
+  + centros() : Map<String,Integer>
+  + grupoDeFila(i : int) : Grupo
+  + getGrupo(clave : String) : Grupo
+  + numEquipos() : int
+  + centro(i) / id(i) / nombre(i) / referencia(i) / marca(i) / modelo(i) / tipo(i) : String
+  - compartir(s : String) : String
+}
+class Grupo {
+  + {static} TIPO_ELECTROMEDICINA = "E"
+  - clave : String
+  - tipoActivo : String
+  - nombre, marca, modelo, referencia : String
+  - filas : int[]
+  - numFilas, orden : int
+  - variasMarcas, variosModelos : boolean
+  - estado : EstadoGrupo
+  - lista : TipoLista
+  - codigo, nombreOficial : String
+  - marcaCorregida, modeloCorregido : String
+  - fecha, origen : String
+  --
+  ~ anadirFila(i, nombre, referencia, marca, modelo) : void
+  ~ cerrar(orden : int) : void
+  + asignar(lista, codigo, nombreOficial, origen, fecha) : void
+  + posponer(fecha : String) : void
+  + reiniciar() : void
+  + isElectromedicina() : boolean
+  + getEquipos() : int
+  + fila(i : int) : int
+  + textoFiltro() : String
+  + asignacionTexto() : String
+}
+class Variantes {
+  - primera : String
+  - vecesPrimera : int
+  - resto : Map<String,Integer>
+  --
+  ~ anadir(valor : String) : void
+  + distintas() : int
+  + masFrecuente() : String
+  + noVacias() : List<Entry<String,Integer>>
+  + ordenadas() : List<Entry<String,Integer>>
+}
+class TerminoOficial {
+  + {static} CABECERA_GMDN : List<String>
+  + {static} CABECERA_MANTENIMIENTO : List<String>
+  + {static} NIVELES : String[]
+  - lista : TipoLista
+  - datos : String[]
+  - creadoEnPrograma : boolean
+  - fechaCreacion : String
+  - codigo, nombre, descripcion : String
+  - codigoNorm, codigoCompacto, nombreNorm : String
+  - palabrasNombre : String[]
+  - descripcionNorm : String
+  --
+  + {static} gmdn(codigo, nombre, descripcion) : TerminoOficial
+  + {static} mantenimiento(once : String[], creado, fecha) : TerminoOficial
+  + nivel(i : int) : Nivel
+  + getCodigoGmdn() : String
+  + getDatos() : String[]
+  + etiqueta() : String
+}
+class "TerminoOficial.Nivel" as Nivel {
+  - codigo : String
+  - nombre : String
+  + vacio() : boolean
+}
+enum TipoLista {
+  GMDN
+  MANTENIMIENTO
+  --
+  + corto() / largo() : String
+  + otra() : TipoLista
+  + {static} desdeTexto(s) : TipoLista
+}
+enum EstadoGrupo {
+  PENDIENTE
+  REVISADO
+  POSPUESTO
+  --
+  + texto() : String
+}
+Proyecto "1" *-- "0..*" Grupo : grupos\n(de más a menos equipos)
+Grupo "1" *-- "4" Variantes : nombre, marca,\nmodelo, referencia
+Grupo --> "1" EstadoGrupo
+Grupo --> "0..1" TipoLista
+TerminoOficial --> "1" TipoLista
+TerminoOficial ..> Nivel : crea
+note bottom of Proyecto
+  Equipos guardados por columnas (un array por dato)
+  y textos repetidos compartidos: 450.000 equipos
+  ocupan menos de 100 MB.
+end note
+note bottom of Grupo
+  Equipos iguales del inventario.
+  Clave = palabras significativas ordenadas del nombre
+  [+ marca + modelo normalizados] + tipo de activo.
+end note
+note bottom of TerminoOficial
+  GMDN: datos = código, nombre, descripción.
+  Mantenimiento: datos = las 11 columnas del Excel;
+  se identifica por el nombre (codigo = nombre).
+end note
+@enduml

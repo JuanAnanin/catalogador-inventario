@@ -1,0 +1,79 @@
+@startuml
+!include estilo.iuml
+title Paquete logica (1/2): importación y catálogos
+class ImportadorInventario <<utilidad>> {
+  + {static} CABECERAS : String[]
+  + {static} OBLIGATORIAS : boolean[]
+  + {static} detectar(f : File) : Mapeo
+  + {static} importar(f, mapeo, agrupar, progreso) : Proyecto
+  ~ {static} clave(cabecera) : String
+}
+class "ImportadorInventario.Mapeo" as Mapeo {
+  + hoja : int
+  + filaCabecera : int
+  + col : int[8]
+  + completo() : boolean
+  + valido() : boolean
+  + faltan() : List<String>
+}
+class ImportadorCatalogos <<utilidad>> {
+  + {static} leer(f : File) : Resultado
+  ~ {static} buscarCabecera(h, cabeceras, minimas) : int[]
+  - {static} leerGmdn(h, cab, r) : List<TerminoOficial>
+  - {static} leerMantenimiento(h, cab, r) : List<TerminoOficial>
+}
+class "ImportadorCatalogos.Resultado" as RC {
+  + gmdn, mantenimiento : List<TerminoOficial>
+  + hojaGmdn, hojaMantenimiento : String
+  + gmdnRepetidos, gmdnIncompletos : int
+  + nombresRepetidos : Set<String>
+}
+class ImportadorResultados <<utilidad>> {
+  + {static} aplicar(f, proyecto, catalogos, memoria,\n   origen, fecha, progreso) : Resumen
+  ~ {static} detectar(f) : int[]
+}
+class Catalogos {
+  + {static} HOJA_GMDN, HOJA_MANTENIMIENTO : String
+  - carpeta : Path
+  - catalogos : Map<TipoLista,Catalogo> {volatile}
+  --
+  + cargar() : void
+  + reemplazar(tipo, terminos, origen, hoja) : int
+  + get(tipo) : Catalogo
+  + total(tipo) : int
+  + porCodigo(lista, codigo) : TerminoOficial
+  + buscar(consulta, lista, enDescripcion, max) : Busqueda
+  + opcionesNivel(nivel, codigoPadre) : List<Nivel>
+  + siguienteCodigo(nivel, codigoPadre) : String
+  + nombreDeCodigo(nivel, codigo) : String
+  + existeNombreMantenimiento(nombre) : boolean
+  + anadirMantenimiento(once : String[]) : TerminoOficial
+  + modificarMantenimiento(anterior, once) : TerminoOficial
+  ~ {static} insertarOrdenado(lista, t) : void
+  - {static} puntuar(palabra, t, conCodigo) : double
+}
+class "Catalogos.Catalogo" as Catalogo {
+  - tipo : TipoLista
+  - terminos : List<TerminoOficial>
+  - porCodigo : Map<String,TerminoOficial>
+  - origen, fecha, hoja : String
+  + porCodigo(codigo) : TerminoOficial
+  + creadasEnPrograma() : int
+}
+class "Catalogos.Busqueda" as Busqueda {
+  - resultados : List<Resultado>
+  - total : int
+}
+class ExportadorCatalogo <<utilidad>> {
+  + {static} exportar(catalogos, incluir, destino) : int
+}
+ImportadorInventario ..> Mapeo : crea
+ImportadorInventario ..> Proyecto : crea
+ImportadorCatalogos ..> RC : crea
+ImportadorResultados ..> Proyecto : asigna grupos
+Catalogos *-- "0..2" Catalogo
+Catalogos ..> Busqueda : crea
+ExportadorCatalogo ..> Catalogos
+ImportadorResultados ..> Catalogos
+class Proyecto
+@enduml

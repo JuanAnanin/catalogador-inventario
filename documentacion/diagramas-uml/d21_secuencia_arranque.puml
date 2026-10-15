@@ -1,0 +1,46 @@
+@startuml
+!include estilo.iuml
+title Secuencia: arranque del programa y elección del modo de trabajo
+autonumber
+actor Usuario
+participant "Main" as M
+participant "Almacen" as AL
+participant "VentanaPrincipal" as VP
+participant "Espera" as ES
+participant "Catalogos /\nMemoria" as CM
+participant "DialogoModo" as DM
+participant "ConfigIA" as CF
+participant "AsistenteIA" as AS
+Usuario -> M : doble clic en el lanzador\n(Windows .bat · macOS .app · Linux .sh)
+M -> M : useSystemProxies = true\naspecto (Windows: nativo;\nmacOS y Linux: Nimbus, con ⌘C/⌘V en macOS)
+M -> AL : predeterminado() · prepararCarpetas()
+M -> AL : bloquearInstancia()
+alt ya hay otra ventana abierta
+  M --> Usuario : «El Catalogador ya está abierto»
+end
+M -> VP : new VentanaPrincipal(almacen)
+VP -> CF : new ConfigIA(carpeta de datos)\n(lee ia.properties)
+M -> VP : setVisible(true) · iniciar()
+VP -> ES : ejecutar("Cargando catálogos y el último proyecto…")
+activate ES
+ES -> CM : cargar()
+ES -> AL : abrir(último proyecto)
+deactivate ES
+VP -> VP : abrirProyecto(p) · mostrarGrupo(primer pendiente)
+alt preguntar al empezar, o primera vez
+  VP -> DM : mostrar(cfg, alEmpezar = true)
+  activate DM
+  Usuario -> DM : «Modo manual» o «Modo IA»\n(+ servicio, clave, modelo)
+  DM -> CF : setModo · setProveedor · setClave…\nguardar() (ia.properties, solo su dueño)
+  DM --> VP : aceptado
+  deactivate DM
+end
+VP -> VP : prepararIA()
+alt modo IA y servicio listo
+  VP -> AS : new AsistenteIA(ClienteIA.desde(cfg), catalogos, memoria)
+  VP -> VP : pedirIA(grupo actual)
+else modo manual (o falta la clave)
+  VP -> VP : asistente = null\n(si falta la clave: «IA en pausa»)
+end
+VP --> Usuario : ventana de trabajo con el modo en la cabecera
+@enduml

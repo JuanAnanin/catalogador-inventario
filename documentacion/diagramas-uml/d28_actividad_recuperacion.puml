@@ -1,0 +1,29 @@
+@startuml
+!include estilo.iuml
+title Actividad: guardado continuo y recuperación tras un cierre inesperado
+start
+partition "Durante el trabajo" {
+  :Guardar / Posponer / Aceptar sugerencia;
+  :Añadir una línea al final de cambios.tsv
+  y forzarla a disco (≈ 0,5 ms);
+  :Añadir lo aprendido a memoria.diario.tsv;
+  if (¿Más de 2.000 cambios?) then (sí)
+    :Escribir estado.tsv completo en un temporal
+    y renombrarlo (atómico); vaciar el diario;
+  else (no)
+  endif
+}
+partition "Al volver a abrir" {
+  :Leer inventario.tsv (equipos) y agrupar;
+  :Aplicar estado.tsv (última instantánea);
+  :Aplicar cambios.tsv línea a línea;
+  if (¿La última línea quedó a medias?) then (sí)
+    :Descartarla (lo anterior está intacto);
+  else (no)
+  endif
+  :Cargar la memoria (memoria.tsv + diario)
+  y las propuestas de la IA;
+  :Mostrar el grupo donde se quedó;
+}
+stop
+@enduml

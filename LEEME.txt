@@ -1,0 +1,154 @@
+﻿CATALOGADOR DE INVENTARIO HOSPITALARIO · versión 3.1
+====================================================
+
+PARA PROBARLO RÁPIDAMENTE
+  documentacion/04_Guia_rapida_de_prueba.pdf: en una hora, paso a paso, con lo que tiene que
+  salir en cada paso y una lista de comprobación de todos los requisitos.
+
+CÓMO ABRIRLO (Java 11 o superior; no usa ninguna librería externa)
+- Windows: doble clic en «Abrir Catalogador (Windows).bat».
+  Busca Java solo (JAVA_HOME, carpetas habituales y PATH) y descarta los antiguos (Java 8);
+  si no encuentra uno válido, abre la página de descarga (adoptium.net → Temurin 21, .msi).
+  Si Windows avisa («Windows protegió su PC»): Más información → Ejecutar de todas formas.
+- macOS: doble clic en «Catalogador.app». La primera vez, si macOS no deja abrirlo
+  (desarrollador no identificado): clic derecho sobre la app → Abrir → Abrir
+  (o Ajustes del Sistema → Privacidad y seguridad → Abrir igualmente).
+  Alternativa: «Abrir Catalogador.command». En macOS los atajos usan ⌘ en vez de Ctrl.
+- Linux: «Abrir Catalogador (Linux).sh» (si hace falta: chmod +x primero).
+- Usa siempre estos lanzadores: reservan al programa hasta el 60 % de la memoria,
+  necesaria con inventarios de cientos de miles de filas (se recomiendan 8 GB o más).
+
+AL ABRIRLO: ¿MODO MANUAL O MODO IA?
+La primera vez pregunta cómo quieres trabajar:
+- Modo manual: tú eliges el nombre oficial de cada grupo con el buscador y las
+  sugerencias de la memoria. No se envía nada fuera del ordenador.
+- Modo IA: además, una inteligencia artificial propone el término oficial de cada
+  grupo (con su % de confianza y el motivo); tú lo aceptas (Ctrl+I) o eliges otro.
+  Solo hay que elegir el servicio y pegar la clave API:
+    Gratuitas ........................ Ollama y LM Studio (en el propio ordenador, sin clave),
+                                       OpenRouter (modelos gratuitos)
+    De pago con versión gratuita ..... Google Gemini, Groq, Mistral, Cerebras, OpenRouter, Cohere
+    De pago .......................... OpenAI (ChatGPT), Anthropic (Claude), DeepSeek, xAI (Grok),
+                                       Hugging Face
+    Otro servicio compatible con OpenAI (por ejemplo, un servidor del hospital)
+  Cómo conseguir la clave de cada uno: botón «¿Cómo se consigue?» en el programa y
+  capítulo 8 del manual. Para empezar gratis: Groq o Google Gemini.
+  Ollama en local: ollama.com/download y, en una terminal, «ollama pull qwen3:8b»
+  (en un Mac con chip Apple y 24 GB, o un PC con tarjeta gráfica de 16 GB, mejor
+  «ollama pull gpt-oss:20b», más preciso; también valen qwen3.5, gemma4, gemma3,
+  llama3.1, llama3.2, deepseek-r1, mistral…).
+  El programa se adapta a cada servicio y modelo (formato de la API, respuesta JSON,
+  razonamiento, límites, contexto de Ollama…).
+  La IA solo elige entre términos de los catálogos importados: nunca inventa códigos.
+  Se le envían nombre, marca, modelo, referencia y tipo de activo; nunca el centro,
+  el id del equipo ni el área.
+Se puede cambiar cuando se quiera: IA → Modo de trabajo… (o el botón de la cabecera).
+
+PRIMEROS PASOS (con los ficheros de la carpeta «ejemplos»)
+1. Archivo → Importar → Catálogos oficiales…  →  Datos_catalogo_que_paso_al_programa.xlsx
+   (un Excel con dos hojas: CATÁLOGO GMDN y CATÁLOGO MANTENIMIENTO)
+2. Archivo → Importar → Inventario del hospital…  (Ctrl+N)  →
+     Datos_inventario_que_paso_al_programa.xlsx    (35 filas, el ejemplo recibido)
+  o  EJEMPLO_inventario_demostracion_600000.xlsx    (600.000 filas, mismo formato, inventadas)
+   Las columnas se reconocen solas por sus títulos (Equipo_codiCentro, Equipo_idEquipo,
+   Equipo_nombre, Equipo_referencia, refMarca_nombre, Equipo_modelo,
+   Equipo_codiTipoActivo, refArea_nombre, Equipo_debaja); si no, se eligen a mano.
+   Se descartan los equipos con Equipo_debaja = S; solo se catalogan los que tienen N.
+3. Revisa los grupos y exporta: Archivo → Exportar → Resultado… (Ctrl+E).
+   «Datos_que_el_programa_debe_devolver.xlsx» es el ejemplo de salida recibido.
+El catálogo GMDN recibido es una muestra de 16 términos: para catalogar el inventario recibido
+de principio a fin, usa ejemplos/grandes/CATALOGO_GRANDE_GMDN_30000.xlsx (manual, capítulo 6).
+
+QUÉ HACE
+- Junta los equipos iguales (nombre + marca + modelo + tipo de activo, aunque estén
+  escritos con otras mayúsculas, acentos o espacios) y los ordena de más a menos equipos.
+- Muestra nombre, referencia, marca y modelo; «Electromedicina» si el tipo es E.
+- Busca en UN catálogo cada vez: GMDN (código, nombre, descripción) o Mantenimiento
+  (nombre y su tipo de activo › uso › familia › subfamilia › subgrupo).
+  Cambia de catálogo con Ctrl+L (⌘L en Mac).
+- Permite corregir la marca y el modelo de todo el grupo.
+- Crea entradas nuevas en el catálogo de Mantenimiento («+ Nueva entrada…», Ctrl+Mayús+N),
+  con los códigos de cada nivel propuestos, y exporta el catálogo actualizado
+  con el mismo formato que el original (Archivo → Exportar → Catálogos…).
+- Aprende de cada clasificación y sugiere la misma respuesta para equipos parecidos.
+- En modo IA: propuestas en segundo plano, «Pedir propuestas para todos los grupos
+  pendientes» y «Aceptar en bloque las propuestas más seguras» (menú IA).
+
+TECLADO (en Mac, ⌘ en lugar de Ctrl y ⇧ en lugar de Mayús)
+  Intro ................. Guardar el nombre oficial seleccionado y pasar al siguiente
+  Ctrl+1  (o F1) ........ Aceptar la sugerencia   (Ctrl+2 / Ctrl+3: las otras posibilidades)
+  Ctrl+I ................ Modo IA: aceptar la propuesta de la IA
+  Ctrl+Mayús+I .......... Modo IA: volver a preguntar a la IA por este grupo
+  Ctrl+P  (o F5) ........ Posponer: dejar como duda y pasar al siguiente
+  Ctrl+L ................ Buscar en el otro catálogo (GMDN ⇄ Mantenimiento)
+  Ctrl+Mayús+N .......... Nueva entrada de mantenimiento
+  ↑ ↓ RePág AvPág ....... Moverse por los resultados del buscador
+  Esc ................... Borrar el texto del buscador
+  Ctrl+F / Ctrl+M / Ctrl+Mayús+M .. Ir al buscador / a la marca / al modelo
+  Ctrl+J ................ Saltar al siguiente pendiente sin guardar
+  Ctrl+N / Ctrl+O ....... Importar inventario / abrir proyecto guardado
+  Ctrl+E ................ Exportar el resultado
+  Ctrl+Q ................ Salir
+  Doble clic en un resultado del buscador: asignarlo y guardar.
+
+COLORES DE LA SUGERENCIA
+  Verde (85 % o más): casi seguro · Naranja (65–84 %): revísalo · Rojo (menos de 65 %): dudoso
+  En modo IA, debajo se lee «Propuesta de la IA» con el motivo, o «y la IA está
+  de acuerdo» si coincide con lo que sugiere la memoria.
+
+RESULTADO (Archivo → Exportar → Resultado)
+Un fichero por centro (Equipo_codiCentro), en Excel (.xlsx) o CSV («;», UTF-8), con:
+  Equipo_codiCentro | Equipo_idEquipo | CÓDIGO GMDN | NOMBRE GMDN y NOMBRE MANTENIMIENTO
+Los equipos catalogados con Mantenimiento no llevan código GMDN (se identifican por el nombre).
+Opciones: incluir también los equipos sin catalogar; añadir columnas de marca y modelo corregidos.
+
+DÓNDE SE GUARDA EL TRABAJO
+Todo se guarda solo, después de cada Guardar o Posponer, en la carpeta «Catalogador»
+de tu carpeta personal (Windows: C:\Users\<usuario>\Catalogador; Mac y Linux: ~/Catalogador):
+  catalogos/        catálogos importados y las entradas de mantenimiento creadas
+  memoria.tsv       lo aprendido; sirve para todos los proyectos
+  proyectos/        cada inventario importado con su estado de revisión
+                    (y ia_propuestas.tsv: las propuestas de la IA ya recibidas)
+  ia.properties     modo de trabajo y claves de IA (no lo compartas)
+Si el programa se cierra de golpe, al volver a abrirlo continúa en el mismo punto.
+Los proyectos de las versiones 2.0 y 3.0 se abren sin cambios en la 3.1.
+
+FORMATOS ADMITIDOS
+.xlsx y .csv (UTF-8 o Windows-1252; separador ; , tabulador o |).
+Los .xls antiguos: ábrelos en Excel y «Guardar como» → .xlsx (o CSV).
+
+FICHEROS DE EJEMPLO (carpeta «ejemplos»)
+  Datos_catalogo_que_paso_al_programa.xlsx     recibido: GMDN 16 términos, Mantenimiento 641
+  Datos_inventario_que_paso_al_programa.xlsx   recibido: 35 filas (16 de baja, 19 equipos, 5 grupos)
+  Datos_que_el_programa_debe_devolver.xlsx     recibido: modelo del resultado
+  EJEMPLO_inventario_demostracion_600000.xlsx  600.000 filas: 479.742 equipos, 732 grupos, 3 centros
+  grandes/INVENTARIO_GRANDE_650000.xlsx (y .csv.zip)   650.000 filas, 8 centros: 507.049 equipos
+  grandes/INVENTARIO_GRANDE_1000000.xlsx       1.000.000 de filas: 780.519 equipos, 31.156 grupos
+  grandes/CATALOGO_GRANDE_GMDN_30000.xlsx      29.997 términos GMDN (los 16 reales + inventados 9xxxxx)
+  grandes/RESULTADO_ESPERADO_GRANDE_650000.xlsx y _1000000.xlsx   lo que debe salir
+Tiempos medidos (2 núcleos, 4 GB para Java): importar 650.000 filas 5 s (CSV 2 s),
+1.000.000 de filas 7 s; exportar 2–3 s; buscar ~10 ms; guardar un grupo <1 ms.
+
+DOCUMENTACIÓN (carpeta «documentacion»)
+  01_Especificacion_de_Requisitos_ERS.pdf   requisitos, casos de uso, modelo de datos, criterios
+                                            de aceptación, trazabilidad y pruebas con sus
+                                            entradas y resultados
+  02_Diagramas_UML_y_Diseno.pdf             arquitectura y diagramas de casos de uso, clases,
+                                            secuencia, actividad (flujo), estados y datos
+  03_Manual_de_Usuario.pdf                  manual paso a paso con capturas y ejemplos en Windows,
+                                            y cómo conseguir la clave de cada servicio de IA
+  04_Guia_rapida_de_prueba.pdf              comprobar en una hora que cumple lo pedido
+  diagramas-uml/                            fuentes PlantUML (.puml) y diagramas (.svg)
+
+CÓDIGO FUENTE (carpeta «codigo-fuente»)
+Java 11+, Swing y la biblioteca estándar (el .xlsx se lee y escribe en flujo, sin Apache POI;
+las API de IA se llaman con java.net.http). Proyecto Maven (pom.xml) o compilar.bat / compilar.sh.
+  catalogador.modelo   Proyecto, Grupo, Variantes, TerminoOficial
+  catalogador.excel    lectura en flujo de .xlsx/.csv y escritura de .xlsx/.csv
+  catalogador.logica   importadores, catálogos, memoria, guardado y exportadores
+  catalogador.ia       servicios de IA, configuración, cliente HTTP (OpenAI, Anthropic y Ollama),
+                       certificados, asistente y propuestas
+  catalogador.ui       ventana principal y diálogos
+  catalogador.util     textos, ficheros TSV, diarios de cambios, JSON y ficheros del sistema
+  pruebas/             programas de prueba con sus datos (requisitos, IA con servidor simulado,
+                       rendimiento y recorrido de la interfaz): ver pruebas/LEEME.txt

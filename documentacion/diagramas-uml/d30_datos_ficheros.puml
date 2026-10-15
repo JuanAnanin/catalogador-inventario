@@ -1,0 +1,61 @@
+@startuml
+!include estilo.iuml
+title Datos guardados por el programa (carpeta «Catalogador» del usuario)
+hide circle
+hide methods
+skinparam class {
+  BackgroundColor #FFFFFF
+}
+class "config.properties" as CFG {
+  ultimoProyecto
+  ultimaCarpeta · carpetaExportar
+  formatoExportar
+}
+class "ia.properties  (solo lo lee su dueño)" as IAP {
+  modo = MANUAL | IA
+  preguntarAlEmpezar
+  proveedor
+  <grupoClave>.clave
+  <id>.modelo · <id>.url
+  lote · umbralBloque
+}
+class "catalogos/GMDN.tsv" as G {
+  #CATALOGO · versión · tipo · origen · fecha · hoja
+  código · nombre · descripción
+}
+class "catalogos/MANTENIMIENTO.tsv" as MT {
+  #CATALOGO · versión · tipo · origen · fecha · hoja
+  11 columnas · creada en el programa (0/1) · fecha
+}
+class "memoria.tsv + memoria.diario.tsv" as MEM {
+  E · nombre · marca · modelo · lista ·
+      código · nombre oficial · fecha
+  M · marca original → corregida
+  D · modelo original → corregido
+  O · (olvidar) nombre · marca · modelo
+}
+class "proyectos/<nombre_fecha>/inventario.tsv" as INV {
+  NOMBRE · ORIGEN · CREADO · AGRUPAR
+  ESTADISTICAS · EQUIPOS
+  E · centro · id · nombre · referencia ·
+      marca · modelo · tipo
+}
+class "estado.tsv + cambios.tsv" as EST {
+  GRUPO · clave · estado · lista · código ·
+  nombre oficial · marca corregida ·
+  modelo corregido · fecha · origen
+}
+class "ia_propuestas.tsv" as PRO {
+  P · clave grupo · lista · código ·
+  nombre oficial · confianza · motivo ·
+  marca · modelo · servicio · fecha
+}
+CFG -[hidden]right- IAP
+G -[hidden]right- MT
+INV "1" -- "1" EST : mismo proyecto
+INV "1" -- "0..1" PRO : mismo proyecto
+EST ..> G : código GMDN
+EST ..> MT : nombre de\nmantenimiento
+MEM ..> G
+MEM ..> MT
+@enduml

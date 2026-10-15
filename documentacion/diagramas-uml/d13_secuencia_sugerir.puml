@@ -1,0 +1,46 @@
+@startuml
+!include estilo.iuml
+title Secuencia: calcular y mostrar sugerencias al cambiar de grupo
+autonumber
+participant "VentanaPrincipal" as VP
+participant "Memoria" as ME
+participant "Huella\n(del grupo)" as H
+participant "Índice de\ntrigramas" as IX
+participant "Huella\n(de cada candidato)" as HE
+participant "InsigniaSimilitud" as IN
+VP -> ME : sugerir(nombre, marca, modelo, 3)
+activate ME
+ME -> H : new Huella(nombre)
+note right of H : palabras significativas y\ntrigramas codificados como enteros
+alt la memoria tiene más de 5.000 entradas
+  ME -> IX : listas de las entradas que comparten\ncada trigrama del grupo
+  IX --> ME : nº de trigramas comunes por entrada
+  ME -> ME : 400 candidatos con mayor Dice aproximado
+else memoria pequeña
+  ME -> ME : todas las entradas son candidatas
+end
+loop cada candidato
+  ME -> H : similitud(candidato.huella)
+  H --> ME : s = 0,55·palabras + 0,45·trigramas
+  ME -> ME : 0,98 si mismo nombre y otra marca/modelo;\nsi no, +0,03 marca, +0,02 modelo
+  ME -> ME : conservar la mejor por (catálogo, término)
+end
+ME --> VP : las 3 mejores (≥ 45 %)
+deactivate ME
+opt modo IA y hay propuesta guardada del grupo
+  VP -> VP : Sugerencia.deIA(término, confianza, motivo)
+  VP -> VP : Sugerencia.combinar(memoria, IA, 3)
+  note right of VP
+    si coinciden: una sola, «y la IA está de acuerdo»
+    (máximo de las dos + 2 puntos, tope 99 %);
+    si no: todas ordenadas por porcentaje
+  end note
+end
+VP -> VP : pintarSugerencias()\nelegir catálogo del buscador
+VP -> IN : setValor(similitud)
+note right of IN
+  verde ≥ 85 % «Casi seguro»
+  naranja 65–84 % «Revísalo»
+  rojo < 65 % «Dudoso»
+end note
+@enduml

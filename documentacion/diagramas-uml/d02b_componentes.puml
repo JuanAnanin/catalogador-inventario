@@ -1,0 +1,45 @@
+@startuml
+!include estilo.iuml
+title Diagrama de componentes
+left to right direction
+component "Interfaz de usuario\n(ui)" as UI
+component "Revisión y reglas\n(logica + modelo)" as LOG
+component "Asistente de IA\n(ia)" as IA
+component "Lectura/escritura\nExcel y CSV (excel)" as XL
+component "Persistencia\n(Almacen, Diario, Tsv)" as PER
+interface "Progreso" as IPRO
+interface "Receptor de filas" as IREC
+interface "Filas (salida)" as IFIL
+interface "HTTP/JSON\nOpenAI Chat Completions" as IOAI
+interface "HTTP/JSON\nAnthropic Messages" as IANT
+interface "HTTP/JSON\nAPI de Ollama (/api/chat)" as IOLL
+database "Carpeta de datos\nCatalogador (carpeta personal)" as DATOS
+cloud "Servicios de IA en la nube\n(OpenAI, Gemini, Groq, Mistral, DeepSeek,\nOpenRouter, Cerebras, Cohere, xAI, Hugging Face)" as NUBE
+cloud "Anthropic (Claude)" as ANT
+node "LM Studio o servidor compatible\n(en el ordenador o en la red)" as LOCAL
+node "Ollama\n(en el ordenador o en la red)" as OLL
+artifact "Inventario .xlsx/.csv\nCatálogos .xlsx" as ENT
+artifact "Resultado por centro\n.xlsx/.csv · Catálogos\nactualizados .xlsx" as SAL
+UI --> LOG
+UI --> IA
+IA --> LOG : candidatos\n(Catalogos, Memoria)
+LOG --> XL
+XL - IREC
+LOG ..> IREC
+XL - IFIL
+LOG ..> IFIL
+UI - IPRO
+XL ..> IPRO
+LOG --> PER
+IA --> PER : ia_propuestas.tsv\nia.properties
+PER --> DATOS
+XL --> ENT : lee
+XL --> SAL : escribe
+IA - IOAI
+IA - IANT
+IA - IOLL
+IOAI --> NUBE
+IOAI --> LOCAL
+IANT --> ANT
+IOLL --> OLL
+@enduml
