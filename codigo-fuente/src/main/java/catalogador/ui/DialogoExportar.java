@@ -17,11 +17,13 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.BorderLayout;
 import java.awt.Dialog;
 import java.awt.Dimension;
@@ -35,12 +37,17 @@ import java.awt.Insets;
 import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Opciones de exportación: formato (Excel o CSV), qué equipos incluir, si se
  * añaden la marca y el modelo, carpeta y nombre de los ficheros. Enseña
- * antes de exportar qué ficheros se van a crear (uno por centro).
+ * antes de exportar los ficheros que se pueden crear (uno por centro) y
+ * permite elegir cuáles se generan: uno, varios o todos.
  */
 final class DialogoExportar extends JDialog {
 
@@ -53,8 +60,111 @@ final class DialogoExportar extends JDialog {
             "Añadir dos columnas con la marca y el modelo (con las correcciones hechas)");
     private final JTextField txtCarpeta = new JTextField(34);
     private final JTextField txtPrefijo = new JTextField(22);
-    private final JTextArea txtVista = new JTextArea(8, 60);
+    private final ModeloFicheros modeloFicheros = new ModeloFicheros();
+    private final JTable tablaFicheros = new JTable(modeloFicheros);
+    private final JLabel lblElegidos = new JLabel(" ");
     private Exportador.Opciones resultado;
+
+    /** Ficheros que se pueden crear, con una casilla para elegir cuáles se generan. */
+    private final class ModeloFicheros extends AbstractTableModel {
+        private List<Exportador.Fichero> ficheros = new ArrayList<>();
+        /** Centros elegidos; null = todos (también los que aparezcan al cambiar las opciones). */
+        private Set<String> elegidos;
+
+        void poner(List<Exportador.Fichero> fs) {
+            ficheros = fs;
+            fireTableDataChanged();
+            refrescarElegidos();
+        }
+
+        boolean elegido(Exportador.Fichero f) {
+            return elegidos == null || elegidos.contains(f.getCentro());
+        }
+
+        void todos(boolean si) {
+            elegidos = si ? null : new HashSet<>();
+            fireTableDataChanged();
+            refrescarElegidos();
+        }
+
+        /** Centros elegidos de los que hay ahora; null si están todos. */
+        Set<String> centros() {
+            if (elegidos == null) {
+                return null;
+            }
+            Set<String> c = new LinkedHashSet<>();
+            boolean todos = true;
+            for (Exportador.Fichero f : ficheros) {
+                if (elegidos.contains(f.getCentro())) {
+                    c.add(f.getCentro());
+                } else {
+                    todos = false;
+                }
+            }
+            return todos && !ficheros.isEmpty() ? null : c;
+        }
+
+        Exportador.Fichero fichero(int fila) {
+            return ficheros.get(fila);
+        }
+
+        @Override
+        public int getRowCount() {
+            return ficheros.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return 4;
+        }
+
+        @Override
+        public String getColumnName(int c) {
+            return c == 0 ? "Generar" : c == 1 ? "Centro" : c == 2 ? "Fichero" : "Equipos";
+        }
+
+        @Override
+        public Class<?> getColumnClass(int c) {
+            return c == 0 ? Boolean.class : c == 3 ? Integer.class : String.class;
+        }
+
+        @Override
+        public boolean isCellEditable(int f, int c) {
+            return c == 0;
+        }
+
+        @Override
+        public Object getValueAt(int f, int c) {
+            Exportador.Fichero x = ficheros.get(f);
+            switch (c) {
+                case 0: return elegido(x);
+                case 1: return x.getCentro().isEmpty() ? "(sin centro)" : x.getCentro();
+                case 2: return x.getFichero().getName() + (x.getFichero().exists() ? "   (ya existe: se sustituirá)" : "");
+                default: return x.getFilas();
+            }
+        }
+
+        @Override
+        public void setValueAt(Object v, int f, int c) {
+            if (c != 0) {
+                return;
+            }
+            if (elegidos == null) {
+                elegidos = new HashSet<>();
+                for (Exportador.Fichero x : ficheros) {
+                    elegidos.add(x.getCentro());
+                }
+            }
+            String centro = ficheros.get(f).getCentro();
+            if (Boolean.TRUE.equals(v)) {
+                elegidos.add(centro);
+            } else {
+                elegidos.remove(centro);
+            }
+            fireTableRowsUpdated(f, f);
+            refrescarElegidos();
+        }
+    }
 
     private DialogoExportar(Window padre, Proyecto proyecto, Exportador.Opciones previas) {
         super(padre, "Exportar el resultado", Dialog.ModalityType.APPLICATION_MODAL);
@@ -63,9 +173,10 @@ final class DialogoExportar extends JDialog {
         JPanel raiz = new JPanel(new BorderLayout(0, 12));
         raiz.setBorder(BorderFactory.createEmptyBorder(16, 18, 14, 18));
         long revisados = proyecto.equipos(EstadoGrupo.REVISADO);
-        raiz.add(new JLabel(Estilo.envolver("Se genera un fichero por cada centro (Equipo_codiCentro) con las columnas "
+        raiz.add(new JLabel(Estilo.envolver("Se puede generar un fichero por cada centro (Equipo_codiCentro) con las columnas "
                 + "<b>Equipo_codiCentro · Equipo_idEquipo · CÓDIGO GMDN · NOMBRE GMDN y NOMBRE MANTENIMIENTO</b>. "
-                + "Los equipos del catálogo de Mantenimiento no llevan código GMDN.<br><br>"
+                + "Los equipos del catálogo de Mantenimiento no llevan código GMDN. Abajo eliges qué ficheros generar: "
+                + "uno, varios o todos.<br><br>"
                 + "Equipos catalogados: <b>" + Estilo.numero(revisados) + "</b> de "
                 + Estilo.numero(proyecto.equiposTotales()) + ".", 640)), BorderLayout.NORTH);
 
@@ -94,12 +205,46 @@ final class DialogoExportar extends JDialog {
         anadir(form, g, fila++, "Carpeta", carpeta);
         anadir(form, g, fila++, "Nombre de los ficheros", txtPrefijo);
 
-        txtVista.setEditable(false);
-        txtVista.setFont(Estilo.fuente(Font.PLAIN, 12f));
-        JScrollPane sv = new JScrollPane(txtVista);
+        tablaFicheros.setRowHeight(24);
+        tablaFicheros.setFillsViewportHeight(true);
+        tablaFicheros.getTableHeader().setReorderingAllowed(false);
+        tablaFicheros.getColumnModel().getColumn(0).setMaxWidth(70);
+        tablaFicheros.getColumnModel().getColumn(0).setMinWidth(62);
+        tablaFicheros.getColumnModel().getColumn(1).setPreferredWidth(150);
+        tablaFicheros.getColumnModel().getColumn(2).setPreferredWidth(380);
+        tablaFicheros.getColumnModel().getColumn(3).setPreferredWidth(80);
+        tablaFicheros.getColumnModel().getColumn(3).setMaxWidth(110);
+        tablaFicheros.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public java.awt.Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foco,
+                                                                    int f, int c) {
+                super.getTableCellRendererComponent(t, v instanceof Integer ? Estilo.numero((Integer) v) : v, sel,
+                        foco, f, c);
+                setHorizontalAlignment(RIGHT);
+                return this;
+            }
+        });
+        tablaFicheros.setToolTipText("Marca la casilla de los ficheros que quieras generar");
+        JScrollPane sv = new JScrollPane(tablaFicheros);
+        sv.setPreferredSize(new Dimension(640, 170));
         JPanel vista = new JPanel(new BorderLayout(0, 4));
-        vista.add(Estilo.etiqueta("Ficheros que se van a crear", Font.BOLD, 12f, Estilo.TEXTO), BorderLayout.NORTH);
+        JPanel tituloVista = new JPanel(new BorderLayout(8, 0));
+        tituloVista.add(Estilo.etiqueta("Ficheros que se pueden crear (marca los que quieras generar)", Font.BOLD, 12f,
+                Estilo.TEXTO), BorderLayout.WEST);
+        JPanel botonesTodos = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        JButton todos = new JButton("Todos");
+        JButton ninguno = new JButton("Ninguno");
+        todos.setToolTipText("Marca todos los ficheros");
+        ninguno.setToolTipText("Desmarca todos (después marca solo los que quieras)");
+        todos.addActionListener(e -> modeloFicheros.todos(true));
+        ninguno.addActionListener(e -> modeloFicheros.todos(false));
+        botonesTodos.add(todos);
+        botonesTodos.add(ninguno);
+        tituloVista.add(botonesTodos, BorderLayout.EAST);
+        vista.add(tituloVista, BorderLayout.NORTH);
         vista.add(sv, BorderLayout.CENTER);
+        lblElegidos.setFont(Estilo.fuente(Font.PLAIN, 12f));
+        vista.add(lblElegidos, BorderLayout.SOUTH);
 
         JPanel centro = new JPanel(new BorderLayout(0, 12));
         centro.add(form, BorderLayout.NORTH);
@@ -126,6 +271,7 @@ final class DialogoExportar extends JDialog {
         chkMarcaModelo.setSelected(previas.incluirMarcaModelo);
         txtCarpeta.setText(previas.carpeta == null ? "" : previas.carpeta.getAbsolutePath());
         txtPrefijo.setText(previas.prefijo);
+        modeloFicheros.elegidos = previas.centros == null ? null : new HashSet<>(previas.centros);
 
         Runnable r = this::refrescarVista;
         rbExcel.addActionListener(e -> r.run());
@@ -167,35 +313,42 @@ final class DialogoExportar extends JDialog {
         o.incluirMarcaModelo = chkMarcaModelo.isSelected();
         o.carpeta = new File(txtCarpeta.getText().trim());
         o.prefijo = txtPrefijo.getText().trim();
+        o.centros = modeloFicheros.centros();
         return o;
     }
 
     private void refrescarVista() {
-        Exportador.Opciones o = opciones();
-        List<Exportador.Fichero> fs = Exportador.previsualizar(proyecto, o);
-        StringBuilder b = new StringBuilder();
+        modeloFicheros.poner(Exportador.previsualizar(proyecto, opciones()));
+    }
+
+    /** Línea bajo la lista: cuántos ficheros y equipos se van a generar. */
+    private void refrescarElegidos() {
+        List<Exportador.Fichero> fs = modeloFicheros.ficheros;
         if (fs.isEmpty()) {
-            b.append("No hay equipos que exportar con estas opciones.\n");
-            if (!o.incluirSinCatalogar) {
-                b.append("(Todavía no se ha catalogado ningún equipo. Marca «Incluir también los equipos sin catalogar» ")
-                        .append("si quieres exportar igualmente.)");
-            }
-        } else {
-            int existen = 0;
-            for (Exportador.Fichero f : fs) {
-                boolean existe = f.getFichero().exists();
-                if (existe) {
+            lblElegidos.setForeground(Estilo.NARANJA);
+            lblElegidos.setText(Estilo.envolver("No hay equipos que exportar con estas opciones."
+                    + (chkSinCatalogar.isSelected() ? "" : " Todavía no se ha catalogado ningún equipo: marca «Incluir "
+                    + "también los equipos sin catalogar» si quieres exportar igualmente."), 640));
+            return;
+        }
+        int n = 0;
+        int existen = 0;
+        long equipos = 0;
+        for (Exportador.Fichero f : fs) {
+            if (modeloFicheros.elegido(f)) {
+                n++;
+                equipos += f.getFilas();
+                if (f.getFichero().exists()) {
                     existen++;
                 }
-                b.append(f.getFichero().getName()).append("   ·   ").append(Estilo.numero(f.getFilas()))
-                        .append(f.getFilas() == 1 ? " equipo" : " equipos")
-                        .append(existe ? "   (ya existe: se sustituirá)" : "").append('\n');
             }
-            b.insert(0, fs.size() + (fs.size() == 1 ? " fichero" : " ficheros")
-                    + (existen > 0 ? " · " + existen + " ya existen y se sustituirán" : "") + ":\n\n");
         }
-        txtVista.setText(b.toString());
-        txtVista.setCaretPosition(0);
+        lblElegidos.setForeground(n == 0 ? Estilo.NARANJA : Estilo.TEXTO);
+        lblElegidos.setText(n == 0 ? "No has elegido ningún fichero: marca al menos uno."
+                : "<html>Se generarán <b>" + n + "</b> de " + fs.size() + (fs.size() == 1 ? " fichero" : " ficheros")
+                + " (" + Estilo.numero(equipos) + (equipos == 1 ? " equipo" : " equipos") + ")"
+                + (existen > 0 ? " · " + existen + (existen == 1 ? " ya existe y se sustituirá" : " ya existen y se sustituirán")
+                : "") + ".</html>");
     }
 
     private void elegirCarpeta() {
@@ -224,6 +377,9 @@ final class DialogoExportar extends JDialog {
     }
 
     private void aceptar() {
+        if (tablaFicheros.isEditing()) {
+            tablaFicheros.getCellEditor().stopCellEditing();
+        }
         Exportador.Opciones o = opciones();
         if (Texto.vacio(txtCarpeta.getText()) || !o.carpeta.isDirectory()) {
             JOptionPane.showMessageDialog(this, "Elige una carpeta que exista.", "Carpeta", JOptionPane.WARNING_MESSAGE);
@@ -234,10 +390,14 @@ final class DialogoExportar extends JDialog {
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
-        List<Exportador.Fichero> fs = Exportador.previsualizar(proyecto, o);
-        if (fs.isEmpty()) {
+        if (Exportador.previsualizar(proyecto, o).isEmpty()) {
             JOptionPane.showMessageDialog(this, "No hay equipos que exportar con estas opciones.", "Exportar",
                     JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (Exportador.seleccionados(proyecto, o).isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Marca al menos un fichero en la lista (o pulsa «Todos»).",
+                    "Elegir ficheros", JOptionPane.WARNING_MESSAGE);
             return;
         }
         resultado = o;

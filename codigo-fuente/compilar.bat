@@ -10,7 +10,7 @@ javac --release 11 -encoding UTF-8 -d build\clases -sourcepath src\main\java src
 if errorlevel 1 goto fallo
 > build\MANIFEST.MF echo Main-Class: catalogador.Main
 >> build\MANIFEST.MF echo Implementation-Title: Catalogador de inventario
->> build\MANIFEST.MF echo Implementation-Version: 3.1
+>> build\MANIFEST.MF echo Implementation-Version: 3.2
 jar cfm Catalogador.jar build\MANIFEST.MF -C build\clases .
 if errorlevel 1 goto fallo
 rmdir /s /q build

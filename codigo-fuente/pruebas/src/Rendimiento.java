@@ -3,6 +3,7 @@ import catalogador.ia.AsistenteIA;
 import catalogador.ia.ClienteIA;
 import catalogador.ia.ProveedorIA;
 import catalogador.logica.Almacen;
+import catalogador.logica.CatalogacionAutomatica;
 import catalogador.logica.Catalogos;
 import catalogador.logica.Exportador;
 import catalogador.logica.ImportadorCatalogos;
@@ -182,6 +183,17 @@ public class Rendimiento {
         fila("Calcular sugerencias (media de " + sug + ")", ms(tot / 1e6 / sug), "máximo " + ms(max / 1e6)
                 + " · memoria de " + n(mem.tamano()));
 
+        // 6b. Catalogación automática de los idénticos: el mismo inventario importado otra vez como un
+        //     inventario posterior, con la memoria llena (opción de la versión 3.2)
+        Proyecto p3 = ImportadorInventario.importar(fInv, m, true, null);
+        empezar();
+        List<Grupo> auto = CatalogacionAutomatica.aplicar(p3.getGrupos(), mem, cats, "15/12/2026 10:00");
+        fila("Catalogación automática de los idénticos (inventario posterior)", s(segundos()), n(auto.size()) + " de "
+                + n(p3.getGrupos().size()) + " grupos · " + n(CatalogacionAutomatica.equipos(auto))
+                + " equipos catalogados solos");
+        p3 = null;
+        auto = null;
+
         // 7. Guardar un grupo (Intro): una línea al final del diario, forzada a disco
         tot = 0;
         int guardados = Math.min(500, gs.size());
@@ -218,6 +230,14 @@ public class Rendimiento {
             bytesC += x.getFichero().length();
         }
         fila("Exportar a CSV (un fichero por centro)", s(tC), cs.size() + " ficheros · " + n(bytesC / 1048576) + " MB");
+        o.csv = false;
+        o.prefijo = "Un_centro";
+        o.centros = java.util.Collections.singleton(xs.get(0).getCentro());
+        empezar();
+        List<Exportador.Fichero> uno = Exportador.exportar(p, o, null);
+        fila("Exportar a Excel un solo centro (elegido)", s(segundos()), uno.size() + " fichero · " + uno.get(0).getCentro()
+                + " · " + n(uno.get(0).getFilas()) + " filas");
+        o.centros = null;
 
         // 9. Comprobar fila a fila el Excel exportado contra el resultado esperado
         empezar();

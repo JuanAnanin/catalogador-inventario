@@ -124,6 +124,8 @@ public final class Memoria {
 
     private final List<Entrada> entradas = new ArrayList<>();          // null = olvidada
     private final Map<String, Integer> porClave = new HashMap<>();
+    /** Posiciones de las entradas por clave de «equipo idéntico» (puede haber varias formas de escribir el nombre). */
+    private final Map<String, Enteros> porIdentico = new HashMap<>();
     private final Map<Integer, Enteros> indice = new HashMap<>();
     private int vivas;
     private final Map<String, String> marcas = new LinkedHashMap<>();
@@ -143,6 +145,7 @@ public final class Memoria {
     public synchronized void cargar() throws IOException {
         entradas.clear();
         porClave.clear();
+        porIdentico.clear();
         indice.clear();
         vivas = 0;
         marcas.clear();
@@ -265,6 +268,7 @@ public final class Memoria {
         int i = entradas.size();
         entradas.add(e);
         porClave.put(k, i);
+        porIdentico.computeIfAbsent(Texto.claveIdentico(e.nombre, e.marca, e.modelo), x -> new Enteros()).anadir(i);
         vivas++;
         for (int t : e.huella.getTrigramas()) {
             indice.computeIfAbsent(t, x -> new Enteros()).anadir(i);
@@ -296,6 +300,59 @@ public final class Memoria {
             pendientes.add(Tsv.linea("O", Texto.seguro(nombre).trim(), Texto.seguro(marca).trim(),
                     Texto.seguro(modelo).trim()));
         }
+    }
+
+    /**
+     * Olvida todo lo aprendido para ese equipo y para los idénticos a él (el mismo
+     * nombre escrito de otra forma, con la misma marca y modelo). Se usa al devolver un
+     * grupo a pendiente: así la catalogación automática no vuelve a asignarle lo mismo.
+     */
+    public synchronized void olvidarIdenticos(String nombre, String marca, String modelo) {
+        olvidar(nombre, marca, modelo);
+        Enteros l = porIdentico.get(Texto.claveIdentico(nombre, marca, modelo));
+        if (l == null) {
+            return;
+        }
+        for (int k = 0; k < l.n; k++) {
+            Entrada e = entradas.get(l.v[k]);
+            if (e != null) {
+                olvidar(e.nombre, e.marca, e.modelo);
+            }
+        }
+    }
+
+    /**
+     * Lo ya catalogado para un equipo idéntico a este (coincidencia del 100 %: las mismas
+     * palabras del nombre en cualquier orden, la misma marca y el mismo modelo, sin
+     * distinguir mayúsculas, tildes ni signos). Devuelve la más reciente, o null si no hay
+     * ninguna o si los idénticos se catalogaron de formas distintas (entonces hay que decidir).
+     */
+    public synchronized Entrada identica(String nombre, String marca, String modelo) {
+        return identica(Texto.claveIdentico(nombre, marca, modelo));
+    }
+
+    /** Igual que {@link #identica(String, String, String)} con la clave ya calculada ({@link Texto#claveIdentico}). */
+    public synchronized Entrada identica(String claveIdentico) {
+        if (claveIdentico.startsWith("|")) {
+            return null; // sin nombre
+        }
+        Enteros l = porIdentico.get(claveIdentico);
+        if (l == null) {
+            return null;
+        }
+        Entrada ultima = null;
+        for (int k = 0; k < l.n; k++) {
+            Entrada e = entradas.get(l.v[k]);
+            if (e == null) {
+                continue; // olvidada o sustituida
+            }
+            if (ultima != null && (ultima.lista != e.lista
+                    || !Texto.normalizar(ultima.codigo).equals(Texto.normalizar(e.codigo)))) {
+                return null; // contradictorias: no se decide solo
+            }
+            ultima = e;
+        }
+        return ultima;
     }
 
     public synchronized void aprenderMarca(String original, String corregida) {

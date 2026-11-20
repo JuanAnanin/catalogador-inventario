@@ -7,6 +7,7 @@ package ui {
   class DialogoEntradaMantenimiento <<JDialog>>
   class DialogoExportar <<JDialog>>
   class DialogoModo <<JDialog>>
+  class DialogoAutomatico <<JDialog>>
 }
 package ia {
   class ConfigIA
@@ -15,6 +16,7 @@ package ia {
   class AsistenteIA
   class PropuestaIA
   class PropuestasGuardadas
+  class AceptacionIA <<utilidad>>
 }
 package logica {
   package "importar / exportar" as IE {
@@ -31,6 +33,7 @@ package logica {
   class Huella
   class Sugerencia
   class Almacen
+  class CatalogacionAutomatica <<utilidad>>
 }
 package modelo {
   class Proyecto
@@ -55,6 +58,12 @@ VentanaPrincipal --> "0..1" Grupo : actual
 VentanaPrincipal ..> DialogoEntradaMantenimiento : crea
 VentanaPrincipal ..> DialogoExportar : crea
 VentanaPrincipal ..> DialogoModo : crea
+VentanaPrincipal ..> DialogoAutomatico : crea
+VentanaPrincipal ..> CatalogacionAutomatica : idénticos
+VentanaPrincipal ..> AceptacionIA : en bloque /\nautomática
+CatalogacionAutomatica ..> Memoria : identica()
+CatalogacionAutomatica ..> Grupo : asigna
+AceptacionIA ..> PropuestasGuardadas
 VentanaPrincipal --> "1" ConfigIA
 VentanaPrincipal --> "0..1" AsistenteIA : en modo IA
 VentanaPrincipal --> "0..1" PropuestasGuardadas : del proyecto

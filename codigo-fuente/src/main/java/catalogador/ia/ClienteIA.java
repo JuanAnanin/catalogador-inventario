@@ -144,7 +144,7 @@ public final class ClienteIA {
     }
 
     static final String VERSION_ANTHROPIC = "2023-06-01";
-    static final String VERSION = "3.1";
+    static final String VERSION = "3.2";
     private static final int MAX_REINTENTOS = 4;
     /** Si el servicio pide esperar más que esto, se trata como cuota agotada (no se espera). */
     static final int MAX_ESPERA_SEGUNDOS = 90;

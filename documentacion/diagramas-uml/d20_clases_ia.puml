@@ -50,6 +50,8 @@ class ConfigIA {
   + getModelo(p) / getUrl(p)
   + estaListo(p) : boolean
   + getLote(p) / getUmbralBloque()
+  + isAceptarAutomatico() / setAceptarAutomatico(b)
+  + getUmbralAutomatico() / setUmbralAutomatico(n)
   + resumen() : String
 }
 enum "ConfigIA.Modo" as Modo {
@@ -138,6 +140,12 @@ class PropuestaIA {
   - fuente, fecha : String
   + tieneTermino() : boolean
 }
+class AceptacionIA <<utilidad>> {
+  + {static} EN_BLOQUE = "IA en bloque"
+  + {static} AUTOMATICA = "IA automática"
+  + {static} seguros(grupos, propuestas, catalogos, umbral) : List<Grupo>
+  + {static} aceptar(grupos, propuestas, memoria, tipo, fecha) : void
+}
 class PropuestasGuardadas {
   + {static} FICHERO = "ia_propuestas.tsv"
   + cargar() / guardar(nuevas)
@@ -161,6 +169,8 @@ Res o-- "0..*" PropuestaIA
 PropuestasGuardadas *-- "0..*" PropuestaIA
 AsistenteIA ..> Catalogos
 AsistenteIA ..> Memoria
+AceptacionIA ..> PropuestasGuardadas
+AceptacionIA ..> Memoria : aprender()
 class Catalogos
 class Memoria
 note bottom of AsistenteIA

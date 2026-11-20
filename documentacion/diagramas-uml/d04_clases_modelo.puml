@@ -29,6 +29,8 @@ class Proyecto {
 }
 class Grupo {
   + {static} TIPO_ELECTROMEDICINA = "E"
+  + {static} ORIGEN_AUTOMATICO = "Automático"
+  + {static} ORIGEN_IA_AUTOMATICA = "IA automática"
   - clave : String
   - tipoActivo : String
   - nombre, marca, modelo, referencia : String
@@ -47,6 +49,8 @@ class Grupo {
   + posponer(fecha : String) : void
   + reiniciar() : void
   + isElectromedicina() : boolean
+  + claveIdentico() : String
+  + esAutomatico() : boolean
   + getEquipos() : int
   + fila(i : int) : int
   + textoFiltro() : String

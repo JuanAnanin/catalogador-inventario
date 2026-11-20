@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
@@ -27,7 +28,8 @@ import java.util.regex.Pattern;
  * </pre>
  * Los equipos catalogados con el catálogo de Mantenimiento no tienen código
  * GMDN (la columna queda vacía) y se identifican por su nombre, que es único.
- * Se crea un fichero (Excel o CSV) por cada centro.
+ * Se crea un fichero (Excel o CSV) por cada centro; se puede elegir cuáles
+ * se generan (uno, varios o todos).
  */
 public final class Exportador {
 
@@ -48,6 +50,13 @@ public final class Exportador {
         public boolean incluirMarcaModelo;
         public File carpeta;
         public String prefijo = "Catalogacion";
+        /** Centros cuyos ficheros se generan; null = todos. */
+        public Set<String> centros;
+
+        /** true si el fichero de ese centro se genera. */
+        public boolean incluye(String centro) {
+            return centros == null || centros.contains(centro);
+        }
 
         public String extension() {
             return csv ? ".csv" : ".xlsx";
@@ -120,39 +129,46 @@ public final class Exportador {
         return o.incluirSinCatalogar || g.getEstado() == EstadoGrupo.REVISADO;
     }
 
-    /** Filas (posiciones de equipos) que van a cada centro, en el orden del inventario. */
-    private static Map<String, int[]> repartir(Proyecto p, Opciones o) {
-        Map<String, int[]> tam = new TreeMap<>();
+    /** Equipos que se exportarían de cada centro (todos los centros, elegidos o no). */
+    private static Map<String, Integer> contar(Proyecto p, Opciones o) {
         Map<String, Integer> cuenta = new TreeMap<>();
         for (int i = 0; i < p.numEquipos(); i++) {
             if (seExporta(p.grupoDeFila(i), o)) {
                 cuenta.merge(p.centro(i), 1, Integer::sum);
             }
         }
+        return cuenta;
+    }
+
+    /** Filas (posiciones de equipos) que van a cada centro elegido, en el orden del inventario. */
+    private static Map<String, int[]> repartir(Proyecto p, Opciones o, Map<String, Integer> cuenta) {
+        Map<String, int[]> tam = new TreeMap<>();
         Map<String, Integer> pos = new TreeMap<>();
         for (Map.Entry<String, Integer> e : cuenta.entrySet()) {
-            tam.put(e.getKey(), new int[e.getValue()]);
-            pos.put(e.getKey(), 0);
+            if (o.incluye(e.getKey())) {
+                tam.put(e.getKey(), new int[e.getValue()]);
+                pos.put(e.getKey(), 0);
+            }
         }
         for (int i = 0; i < p.numEquipos(); i++) {
             if (seExporta(p.grupoDeFila(i), o)) {
                 String c = p.centro(i);
-                int k = pos.get(c);
-                tam.get(c)[k] = i;
-                pos.put(c, k + 1);
+                Integer k = pos.get(c);
+                if (k != null) {
+                    tam.get(c)[k] = i;
+                    pos.put(c, k + 1);
+                }
             }
         }
         return tam;
     }
 
-    /** Lo que se va a crear, sin escribir nada (para enseñarlo antes de exportar). */
+    /**
+     * Todos los ficheros que se podrían crear (uno por centro), elegidos o no, sin
+     * escribir nada: para enseñarlos y elegir cuáles se generan.
+     */
     public static List<Fichero> previsualizar(Proyecto p, Opciones o) {
-        Map<String, Integer> cuenta = new TreeMap<>();
-        for (int i = 0; i < p.numEquipos(); i++) {
-            if (seExporta(p.grupoDeFila(i), o)) {
-                cuenta.merge(p.centro(i), 1, Integer::sum);
-            }
-        }
+        Map<String, Integer> cuenta = contar(p, o);
         List<Fichero> l = new ArrayList<>();
         Map<String, String> nombres = nombresFicheros(cuenta.keySet(), o);
         for (Map.Entry<String, Integer> e : cuenta.entrySet()) {
@@ -161,8 +177,21 @@ public final class Exportador {
         return l;
     }
 
+    /** Solo los ficheros que se van a crear (los de los centros elegidos). */
+    public static List<Fichero> seleccionados(Proyecto p, Opciones o) {
+        List<Fichero> l = new ArrayList<>();
+        for (Fichero f : previsualizar(p, o)) {
+            if (o.incluye(f.getCentro())) {
+                l.add(f);
+            }
+        }
+        return l;
+    }
+
+    /** Crea los ficheros de los centros elegidos (todos si no se ha elegido ninguno en particular). */
     public static List<Fichero> exportar(Proyecto p, Opciones o, LectorTablas.Progreso progreso) throws IOException {
-        Map<String, int[]> reparto = repartir(p, o);
+        Map<String, Integer> cuenta = contar(p, o);
+        Map<String, int[]> reparto = repartir(p, o, cuenta);
         long total = 0;
         for (int[] f : reparto.values()) {
             total += f.length;
@@ -174,7 +203,8 @@ public final class Exportador {
             cabecera.addAll(COLUMNAS_MARCA_MODELO);
         }
         List<Fichero> creados = new ArrayList<>();
-        Map<String, String> nombres = nombresFicheros(reparto.keySet(), o);
+        // Los nombres se calculan con todos los centros: no cambian según cuáles se elijan
+        Map<String, String> nombres = nombresFicheros(cuenta.keySet(), o);
         for (Map.Entry<String, int[]> e : reparto.entrySet()) {
             String centro = e.getKey();
             int[] filas = e.getValue();

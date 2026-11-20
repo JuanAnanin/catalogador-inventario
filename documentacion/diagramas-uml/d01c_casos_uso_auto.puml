@@ -1,0 +1,44 @@
+@startuml
+!include estilo.iuml
+title Catalogación automática y exportación por centros (versión 3.2)
+left to right direction
+skinparam packageStyle rectangle
+actor "Persona que cataloga" as U
+actor "Servicio de IA" as IA <<sistema>>
+rectangle "Catalogador de inventario" {
+  usecase "CU-19 Configurar la\ncatalogación automática\n(desactivada por defecto)" as CU19
+  usecase "Catalogar sin preguntar\nlos idénticos (100 %)\n[modo manual e IA]" as ID
+  usecase "Aceptar sin preguntar las\npropuestas de la IA ≥ N %\n[solo modo IA]" as AI
+  usecase "Catalogar ahora los\nidénticos (una vez)" as AH
+  usecase "CU-02 Importar\nun inventario" as CU02
+  usecase "CU-04 Revisar\nun grupo" as CU04
+  usecase "CU-17 Pedir propuestas\npara todos" as CU17
+  usecase "CU-20 Revisar lo\ncatalogado automáticamente\n(filtro de la cola)" as CU20
+  usecase "Devolver un grupo\na pendiente" as DP
+  usecase "CU-11 Exportar\nel resultado" as CU11
+  usecase "Elegir los ficheros:\nuno, varios o todos\nlos centros" as EF
+}
+U --> CU19
+U --> AH
+U --> CU02
+U --> CU04
+U --> CU20
+U --> CU11
+CU19 ..> ID : <<include>>
+CU19 <.. AI : <<extend>>\n[modo IA]
+CU02 <.. ID : <<extend>>\n[opción activada]
+CU04 <.. ID : <<extend>>\n[sus idénticos pendientes]
+CU02 <.. AI : <<extend>>\n[opción activada]
+CU17 <.. AI : <<extend>>
+AI ..> CU17 : <<include>>\n(al importar)
+CU20 <.. DP : <<extend>>
+CU11 ..> EF : <<include>>
+CU17 --> IA
+note bottom of ID
+  Idéntico: las mismas palabras del nombre
+  (en cualquier orden, sin mayúsculas, tildes
+  ni signos), la misma marca y el mismo modelo
+  que uno ya catalogado. Se le asigna el mismo
+  código y nombre, con el origen «Automático».
+end note
+@enduml

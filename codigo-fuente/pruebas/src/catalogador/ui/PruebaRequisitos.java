@@ -3,6 +3,7 @@ package catalogador.ui;
 import catalogador.excel.Hoja;
 import catalogador.excel.LectorTablas;
 import catalogador.logica.Almacen;
+import catalogador.logica.CatalogacionAutomatica;
 import catalogador.logica.Catalogos;
 import catalogador.logica.Exportador;
 import catalogador.logica.ExportadorCatalogo;
@@ -143,8 +144,9 @@ public final class PruebaRequisitos {
         Files.createDirectories(trabajo.resolve("datosP").resolve("catalogos"));
         catsP.reemplazar(TipoLista.GMDN, rp.gmdn, "Catalogos_PRUEBA.xlsx", rp.hojaGmdn);
         catsP.reemplazar(TipoLista.MANTENIMIENTO, rp.mantenimiento, "Catalogos_PRUEBA.xlsx", rp.hojaMantenimiento);
-        comprobar("RF-23", catsP.total(TipoLista.GMDN) == 22 && catsP.total(TipoLista.MANTENIMIENTO) == 641,
-                "Catalogos_PRUEBA: GMDN 22 · Mantenimiento 641");
+        comprobar("RF-23", catsP.total(TipoLista.GMDN) == 23 && catsP.total(TipoLista.MANTENIMIENTO) == 641
+                        && catsP.porCodigo(TipoLista.GMDN, "34870") != null,
+                "Catalogos_PRUEBA: GMDN 23 (con el 34870 del ejemplo de la hoja de mejoras) · Mantenimiento 641");
         File casos = pr.resolve("Inventario_PRUEBA_casos.xlsx").toFile();
         Proyecto pc = ImportadorInventario.importar(casos, ImportadorInventario.detectar(casos), true, null);
         comprobar("RF-15", pc.getFilasLeidas() == 51 && pc.getDescartadosBaja() == 6 && pc.getDescartadosOtros() == 2
@@ -178,6 +180,19 @@ public final class PruebaRequisitos {
         Proyecto po = ImportadorInventario.importar(otros, mm, true, null);
         comprobar("RF-12", po.numEquipos() == 43 && po.getGrupos().size() == 11,
                 "…y la ventana de columnas las propone bien (Centro, Nº equipo, Denominación…): mismas cifras");
+
+        // Columnas en otro orden, columnas de más y sin las opcionales (la duda de la hoja de mejoras)
+        File colum = pr.resolve("Inventario_PRUEBA_columnas.xlsx").toFile();
+        ImportadorInventario.Mapeo mc = ImportadorInventario.detectar(colum);
+        comprobar("RF-12", mc != null && mc.valido() && !mc.completo()
+                        && mc.faltan().equals(Arrays.asList("Equipo_referencia", "Equipo_codiTipoActivo"))
+                        && mc.col[ImportadorInventario.NOMBRE] == 0 && mc.col[ImportadorInventario.CENTRO] == 5,
+                "columnas en otro orden, 3 de más y sin Equipo_referencia ni Equipo_codiTipoActivo: se reconocen solas "
+                        + "(faltan " + (mc == null ? "?" : mc.faltan()) + ", que no son obligatorias)");
+        Proyecto pcol = ImportadorInventario.importar(colum, mc, true, null);
+        comprobar("RF-12", pcol.getFilasLeidas() == 51 && pcol.getDescartadosBaja() == 6 && pcol.numEquipos() == 43
+                        && pcol.getGrupos().size() == 11 && pcol.getGrupos().stream().noneMatch(Grupo::isElectromedicina),
+                "…mismas cifras (51 filas · 6 de baja · 43 equipos · 11 grupos); sin tipo de activo no hay «Electromedicina»");
 
         // ------------------------------------------------------------------ revisar (memoria, sugerencias, posponer)
         titulo("Revisión");
@@ -345,6 +360,143 @@ public final class PruebaRequisitos {
         comprobar("RF-16", fr.size() == 4 && nombresR.size() == 4 && creadosR != null && creadosR.length == 4,
                 "centros «C/S NORTE», «C:S NORTE» y «c s norte»: 3 ficheros distintos, ninguno pisa a otro "
                         + "(Windows y macOS no distinguen mayúsculas): " + nombresR);
+
+        // ------------------------------------------------------------------ elegir qué ficheros exportar
+        titulo("Exportar solo los centros elegidos");
+        Exportador.Opciones oe = new Exportador.Opciones();
+        oe.carpeta = trabajo.resolve("resultado_elegidos").toFile();
+        oe.carpeta.mkdirs();
+        oe.prefijo = "Catalogacion";
+        List<Exportador.Fichero> todosF = Exportador.previsualizar(reabierto, oe);
+        oe.centros = new java.util.HashSet<>(Collections.singletonList("GAICR"));
+        List<Exportador.Fichero> uno = Exportador.exportar(reabierto, oe, null);
+        String[] enCarpeta = oe.carpeta.list();
+        comprobar("RF-38", todosF.size() == 3 && uno.size() == 1 && uno.get(0).getCentro().equals("GAICR")
+                        && uno.get(0).getFilas() == 14 && enCarpeta != null && enCarpeta.length == 1
+                        && enCarpeta[0].equals("Catalogacion_GAICR.xlsx"),
+                "solo un centro (GAICR): se crea un único fichero, Catalogacion_GAICR.xlsx, con sus 14 filas");
+        oe.centros = new java.util.HashSet<>(Arrays.asList("GAIVI", "GAIPU"));
+        List<Exportador.Fichero> dos = Exportador.exportar(reabierto, oe, null);
+        comprobar("RF-38", dos.size() == 2 && Exportador.seleccionados(reabierto, oe).size() == 2
+                        && dos.stream().noneMatch(f -> f.getCentro().equals("GAICR")) && oe.carpeta.list().length == 3,
+                "varios (GAIVI y GAIPU): sus 2 ficheros; el de GAICR no se vuelve a escribir");
+        oe.centros = null;
+        oe.prefijo = "Todos";
+        comprobar("RF-38", Exportador.exportar(reabierto, oe, null).size() == 3, "todos (opción por defecto): 3 ficheros");
+        oe.centros = new java.util.HashSet<>(Collections.singletonList("GAIPU"));
+        oe.prefijo = "Catalogacion";
+        comprobar("RF-38", Exportador.seleccionados(reabierto, oe).get(0).getFichero().getName()
+                        .equals(todosF.stream().filter(f -> f.getCentro().equals("GAIPU")).findFirst().get().getFichero().getName()),
+                "el nombre de cada fichero no cambia según los que se elijan");
+
+        // ------------------------------------------------------------------ catalogación automática de los idénticos
+        titulo("Catalogación automática de los idénticos (opción; modo manual y modo IA)");
+        // Lo catalogado en el paquete de pruebas queda en la memoria, como al trabajar en la ventana
+        Memoria memA = new Memoria(trabajo.resolve("datosA"));
+        Files.createDirectories(trabajo.resolve("datosA"));
+        memA.cargar();
+        for (Grupo g : reabierto.getGrupos()) {
+            if (g.getEstado() == EstadoGrupo.REVISADO) {
+                memA.aprender(g.getNombre(), g.getMarca(), g.getModelo(), g.getLista(), g.getCodigo(), g.getNombreOficial(),
+                        "11/12/2026 12:00");
+            }
+        }
+        File autoInv = pr.resolve("Inventario_PRUEBA_automatico.xlsx").toFile();
+        Proyecto pa = ImportadorInventario.importar(autoInv, ImportadorInventario.detectar(autoInv), true, null);
+        comprobar("RF-36", pa.numEquipos() == 25 && pa.getGrupos().size() == 12 && pa.contar(EstadoGrupo.REVISADO) == 0,
+                "inventario posterior: 25 equipos en 12 grupos; sin la opción no se cataloga nada solo");
+        Grupo bombaA = buscar(pa, "Bomba de infusión");
+        Sugerencia sBomba = memA.sugerir(bombaA.getNombre(), bombaA.getMarca(), bombaA.getModelo(), 1).get(0);
+        comprobar("RF-36", sBomba.porcentaje() == 100 && Sugerencia.nivel(sBomba.getSimilitud()).equals("Idéntico")
+                        && memA.identica(bombaA.getNombre(), bombaA.getMarca(), bombaA.getModelo()) != null,
+                "«Bomba de infusión» · BRAUN · «Infusomat Space» = «BOMBA DE INFUSION» · BRAUN · «INFUSOMAT SPACE»: "
+                        + "sugerencia al 100 %, «Idéntico»");
+        List<Grupo> auto1 = CatalogacionAutomatica.aplicar(pa.getGrupos(), memA, catsP, "15/12/2026 09:00");
+        StringBuilder nombresA = new StringBuilder();
+        for (Grupo g : auto1) {
+            nombresA.append(nombresA.length() == 0 ? "" : ", ").append(g.getNombre());
+        }
+        comprobar("RF-36", auto1.size() == 6 && CatalogacionAutomatica.equipos(auto1) == 14
+                        && auto1.stream().allMatch(g -> g.getEstado() == EstadoGrupo.REVISADO && g.esAutomatico()
+                        && g.getOrigen().equals(CatalogacionAutomatica.ORIGEN)),
+                "al importarlo con la opción: 6 grupos (14 equipos) catalogados solos, con origen «Automático…»: " + nombresA);
+        comprobar("RF-36", bombaA.getLista() == TipoLista.GMDN && bombaA.getCodigo().equals("990001")
+                        && buscar(pa, "INFUSION, BOMBA DE").getCodigo().equals("990001")
+                        && buscar(pa, "Silla").getLista() == TipoLista.MANTENIMIENTO
+                        && buscar(pa, "Silla").getNombreOficial().equals("SILLA"),
+                "con el mismo código y nombre que el ya catalogado (también con las palabras en otro orden)");
+        Grupo otroModelo = pa.getGrupos().stream().filter(g -> g.getModelo().equals("INFUSOMAT P")).findFirst().get();
+        Grupo otraMarca = pa.getGrupos().stream().filter(g -> g.getMarca().equals("FRESENIUS")).findFirst().get();
+        comprobar("RF-36", otroModelo.getEstado() == EstadoGrupo.PENDIENTE && otraMarca.getEstado() == EstadoGrupo.PENDIENTE
+                        && memA.sugerir(otraMarca.getNombre(), otraMarca.getMarca(), otraMarca.getModelo(), 1).get(0).porcentaje() == 98
+                        && buscar(pa, "ARMARIO METALICO 2 PUERTAS").getEstado() == EstadoGrupo.PENDIENTE
+                        && buscar(pa, "EQUIPO RARO SIN IDENTIFICAR").getEstado() == EstadoGrupo.PENDIENTE,
+                "no se tocan: otro modelo, otra marca (sugerencia 98 %), un nombre parecido ni lo que era una duda");
+        // El ejemplo de la hoja de mejoras: se cataloga a mano uno y el idéntico se cataloga solo
+        Grupo cama = pa.getGrupos().stream().filter(g -> g.getMarca().equals("HILL-ROM")).findFirst().get();
+        Grupo camaMin = pa.getGrupos().stream().filter(g -> g.getMarca().equals("Hill-Rom")).findFirst().get();
+        TerminoOficial t34870 = catsP.porCodigo(TipoLista.GMDN, "34870");
+        cama.asignar(TipoLista.GMDN, "34870", t34870.getNombre(), "Buscador", "15/12/2026 09:05");
+        memA.aprender(cama.getNombre(), cama.getMarca(), cama.getModelo(), TipoLista.GMDN, "34870", t34870.getNombre(),
+                "15/12/2026 09:05");
+        List<Grupo> auto2 = CatalogacionAutomatica.aplicar(pa.getGrupos(), memA, catsP, "15/12/2026 09:05");
+        comprobar("RF-36", auto2.size() == 1 && auto2.get(0) == camaMin && camaMin.getCodigo().equals("34870")
+                        && camaMin.getNombreOficial().equals("Cama hospitalaria eléctrica básica"),
+                "ejemplo de la hoja de mejoras: catalogada a mano «CAMA CLINICA… HILL-ROM · P7500A002197» como 34870, la "
+                        + "idéntica escrita en minúsculas (otro tipo de activo) se cataloga sola con 34870 · "
+                        + "Cama hospitalaria eléctrica básica");
+        // Lo que no se decide solo
+        Proyecto pb = ImportadorInventario.importar(autoInv, ImportadorInventario.detectar(autoInv), true, null);
+        buscar(pb, "DESFIBRILADOR").posponer("15/12/2026 09:10");
+        memA.aprender("EQUIPO RARO SIN IDENTIFICAR", "", "", TipoLista.GMDN, "999999", "No está en el catálogo",
+                "15/12/2026 09:10");
+        memA.aprender("ARMARIO METALICO 2 PUERTAS", "", "", TipoLista.MANTENIMIENTO, "ARMARIO", "ARMARIO", "15/12/2026 09:10");
+        memA.aprender("PUERTAS ARMARIO METALICO 2", "", "", TipoLista.MANTENIMIENTO, "SILLA", "SILLA", "15/12/2026 09:11");
+        List<Grupo> auto3 = CatalogacionAutomatica.aplicar(pb.getGrupos(), memA, catsP, "15/12/2026 09:12");
+        comprobar("RF-36", buscar(pb, "DESFIBRILADOR").getEstado() == EstadoGrupo.POSPUESTO
+                        && buscar(pb, "EQUIPO RARO SIN IDENTIFICAR").getEstado() == EstadoGrupo.PENDIENTE
+                        && buscar(pb, "ARMARIO METALICO 2 PUERTAS").getEstado() == EstadoGrupo.PENDIENTE
+                        && auto3.size() == 7,
+                "se respetan las dudas; no se asigna un término que no está en el catálogo ni si los idénticos se "
+                        + "catalogaron de dos formas distintas (7 grupos solos)");
+        Proyecto pm = ImportadorInventario.importar(autoInv, ImportadorInventario.detectar(autoInv), false, null);
+        Grupo bombasMezcla = pm.getGrupos().stream().filter(g -> g.variasMarcas()).findFirst().orElse(null);
+        CatalogacionAutomatica.aplicar(pm.getGrupos(), memA, catsP, "15/12/2026 09:13");
+        comprobar("RF-36", bombasMezcla != null && bombasMezcla.getEstado() == EstadoGrupo.PENDIENTE,
+                "sin «Separar por marca y modelo», un grupo que mezcla marcas («" + (bombasMezcla == null ? "?"
+                        : bombasMezcla.getNombre()) + "», BRAUN y FRESENIUS) no se cataloga solo");
+        // Se guarda y se exporta como lo demás
+        Almacen alA = new Almacen(trabajo.resolve("datosA"));
+        alA.prepararCarpetas();
+        pa.setNombre("automatico");
+        pa.setFicheroOrigen(autoInv.getName());
+        pa.setCreado("15/12/2026 09:00");
+        pa.setCarpeta(alA.nuevaCarpetaProyecto("automatico"));
+        alA.guardarInventario(pa);
+        alA.guardarEstado(pa);
+        Proyecto paR = alA.abrir(pa.getCarpeta(), null);
+        Grupo camaR = paR.getGrupos().stream().filter(g -> g.getMarca().equals("Hill-Rom")).findFirst().get();
+        comprobar("RF-36", paR.contar(EstadoGrupo.REVISADO) == 8 && camaR.esAutomatico()
+                        && paR.getGrupos().stream().filter(Grupo::esAutomatico).count() == 7,
+                "tras reabrir el proyecto siguen catalogados y se distinguen los automáticos (7) del catalogado a mano");
+        Exportador.Opciones oa = new Exportador.Opciones();
+        oa.carpeta = trabajo.resolve("resultado_automatico").toFile();
+        oa.carpeta.mkdirs();
+        oa.prefijo = "Automatico";
+        oa.centros = new java.util.HashSet<>(Collections.singletonList("GAIPU"));
+        List<Exportador.Fichero> fa = Exportador.exportar(paR, oa, null);
+        Hoja ha = LectorTablas.leerHoja(fa.get(0).getFichero(), 0, 50);
+        boolean camaExportada = false;
+        for (int i = 1; i < ha.numFilas(); i++) {
+            if (ha.celda(i, 2).equals("34870") && ha.celda(i, 3).equals("Cama hospitalaria eléctrica básica")) {
+                camaExportada = true;
+            }
+        }
+        comprobar("RF-36", fa.size() == 1 && camaExportada, "el resultado de GAIPU lleva la cama catalogada sola con "
+                + "34870 · Cama hospitalaria eléctrica básica");
+        memA.olvidarIdenticos(cama.getNombre(), cama.getMarca(), cama.getModelo());
+        comprobar("RF-36", memA.identica(camaMin.getNombre(), camaMin.getMarca(), camaMin.getModelo()) == null,
+                "al devolver uno a pendiente (con la opción activada) se olvidan también sus idénticos");
 
         // ------------------------------------------------------------------ resultado anterior
         titulo("Importar un resultado anterior");

@@ -1,12 +1,14 @@
 package catalogador.ui;
 
 import catalogador.excel.LectorTablas;
+import catalogador.ia.AceptacionIA;
 import catalogador.ia.AsistenteIA;
 import catalogador.ia.ClienteIA;
 import catalogador.ia.ConfigIA;
 import catalogador.ia.PropuestaIA;
 import catalogador.ia.PropuestasGuardadas;
 import catalogador.logica.Almacen;
+import catalogador.logica.CatalogacionAutomatica;
 import catalogador.logica.Catalogos;
 import catalogador.logica.Exportador;
 import catalogador.logica.ExportadorCatalogo;
@@ -111,13 +113,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class VentanaPrincipal extends JFrame {
 
     /** Versión del programa (se muestra en «Acerca de»). */
-    public static final String VERSION = "3.1";
+    public static final String VERSION = "3.2";
     private static final int MAX_RESULTADOS = 300;
     private static final int ANCHO_COLUMNA_IZQ = 400;
-    private static final String[] FILTROS_COLA = {"Pendientes", "Pospuestos (dudas)", "Revisados", "Todos"};
+    private static final String[] FILTROS_COLA = {"Pendientes", "Pospuestos (dudas)", "Revisados",
+            "Catalogados automáticamente", "Todos"};
     private static final int FILTRO_PENDIENTES = 0;
     private static final int FILTRO_POSPUESTOS = 1;
     private static final int FILTRO_REVISADOS = 2;
+    private static final int FILTRO_AUTOMATICOS = 3;
+    /** Clave de config.properties de la opción «catalogar sin preguntar los idénticos». */
+    static final String CONFIG_AUTO_IDENTICOS = "catalogarIdenticos";
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final Almacen almacen;
@@ -138,6 +144,7 @@ public final class VentanaPrincipal extends JFrame {
         return t;
     });
     private final JButton btnModo = new JButton(" ");
+    private final JButton btnAuto = new JButton(" ");
     private final JLabel lblIA = new JLabel(" ");
     private JLabel lblTituloSug;
     private final JLabel lblSinSug = new JLabel(" ");
@@ -226,8 +233,9 @@ public final class VentanaPrincipal extends JFrame {
     // ---- barra de estado
     private final JLabel lblEstadoBarra = new JLabel(" ");
 
-    // ---- última exportación (se recuerdan las opciones)
+    // ---- última exportación (se recuerdan las opciones, y los centros elegidos si es el mismo proyecto)
     private Exportador.Opciones opcionesExportar;
+    private Proyecto proyectoExportado;
 
     // ---- búsqueda en segundo plano
     private final ExecutorService hiloBusqueda = Executors.newSingleThreadExecutor(r -> {
@@ -391,10 +399,20 @@ public final class VentanaPrincipal extends JFrame {
         btnModo.setFocusable(false);
         btnModo.setToolTipText("Cambiar entre modo manual y modo IA, o el servicio de IA");
         btnModo.addActionListener(e -> abrirModo());
+        // Catalogación automática (desactivada por defecto): también a la vista, debajo del modo
+        btnAuto.setFont(Estilo.fuente(Font.PLAIN, 11.5f));
+        btnAuto.setFocusable(false);
+        btnAuto.addActionListener(e -> abrirAutomatico());
         GridBagConstraints c = new GridBagConstraints();
         c.weightx = 1;
+        c.gridx = 0;
+        c.gridy = 0;
         c.anchor = GridBagConstraints.EAST;
+        c.fill = GridBagConstraints.NONE;
         medio.add(btnModo, c);
+        c.gridy = 1;
+        c.insets = new Insets(4, 0, 0, 0);
+        medio.add(btnAuto, c);
         p.add(medio, BorderLayout.CENTER);
         return p;
     }
@@ -913,7 +931,8 @@ public final class VentanaPrincipal extends JFrame {
                 this::importarClasificaciones));
         archivo.add(importar);
         JMenu exportar = new JMenu("Exportar");
-        exportar.add(item("Resultado (un Excel o CSV por centro)…", KeyEvent.VK_E, 0, this::exportar));
+        exportar.add(item("Resultado (un Excel o CSV por centro: todos o los que elijas)…", KeyEvent.VK_E, 0,
+                this::exportar));
         exportar.add(item("Catálogos con las entradas nuevas (Excel igual al original)…", 0, 0, this::exportarCatalogos));
         archivo.add(exportar);
         archivo.addSeparator();
@@ -951,6 +970,9 @@ public final class VentanaPrincipal extends JFrame {
         revision.addSeparator();
         revision.add(item("Revisar los pospuestos (dudas)", 0, 0, this::revisarPospuestos));
         revision.add(item("Devolver este grupo a pendiente", 0, 0, this::volverAPendiente));
+        revision.addSeparator();
+        revision.add(item("Catalogación automática (opciones)…", 0, 0, this::abrirAutomatico));
+        revision.add(item("Catalogar ahora los idénticos a otros ya catalogados…", 0, 0, this::catalogarIdenticosAhora));
         barra.add(revision);
 
         JMenu ia = new JMenu("IA");
@@ -962,6 +984,8 @@ public final class VentanaPrincipal extends JFrame {
         accionesIA.add(null);
         accionesIA.add(item("Pedir propuestas para todos los grupos pendientes…", 0, 0, this::pedirTodasIA));
         accionesIA.add(item("Aceptar en bloque las propuestas más seguras…", 0, 0, this::aceptarEnBloqueIA));
+        accionesIA.add(item("Aceptar solas las propuestas más seguras (catalogación automática)…", 0, 0,
+                this::abrirAutomatico));
         accionesIA.add(null);
         accionesIA.add(item("Borrar las propuestas guardadas de este proyecto…", 0, 0, this::borrarPropuestasIA));
         accionesIA.add(item("Consumo de la IA en esta sesión", 0, 0, this::consumoIA));
@@ -1065,6 +1089,7 @@ public final class VentanaPrincipal extends JFrame {
                     + "\n\n" + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
         refrescarListas();
+        actualizarModo(); // la cabecera dice el modo y la catalogación automática desde el principio
         final String[] errorProyecto = {null};
         final boolean[] antiguo = {false};
         Espera.ejecutar(this, "Cargando catálogos y el último proyecto…", "equipos", avance -> {
@@ -1141,6 +1166,7 @@ public final class VentanaPrincipal extends JFrame {
         panelCola.setVisible(true);
         barraProgreso.setVisible(true);
         cartas.show(centro, "trabajo");
+        catalogarSolo(true, null); // si está activada (lo nuevo de la memoria o de la IA desde la última vez)
 
         Grupo primero = siguienteCon(EstadoGrupo.PENDIENTE, null);
         int filtro = FILTRO_PENDIENTES;
@@ -1209,7 +1235,13 @@ public final class VentanaPrincipal extends JFrame {
         }
         lblVariantes.setText(v.length() == 0 ? " " : Texto.recortar(v.toString(), 190));
         lblVariantes.setToolTipText(v.length() == 0 ? null : v.toString());
-        if (g.getEstado() == EstadoGrupo.REVISADO) {
+        if (g.getEstado() == EstadoGrupo.REVISADO && g.esAutomatico()) {
+            lblAsignado.setForeground(Estilo.VERDE);
+            lblAsignado.setText("✔ Catalogado automáticamente → " + g.asignacionTexto() + "   (" + g.getFecha() + " · "
+                    + (g.getOrigen().startsWith(Grupo.ORIGEN_IA_AUTOMATICA) ? "propuesta de la IA"
+                    : "idéntico a uno ya catalogado") + ")");
+            lblAsignado.setToolTipText(g.getOrigen());
+        } else if (g.getEstado() == EstadoGrupo.REVISADO) {
             lblAsignado.setForeground(Estilo.VERDE);
             lblAsignado.setText("✔ Ya revisado → " + g.asignacionTexto() + "   (" + g.getFecha() + ")");
         } else if (g.getEstado() == EstadoGrupo.POSPUESTO) {
@@ -1217,6 +1249,9 @@ public final class VentanaPrincipal extends JFrame {
             lblAsignado.setText("Marcado como duda el " + g.getFecha());
         } else {
             lblAsignado.setText(" ");
+        }
+        if (!g.esAutomatico()) {
+            lblAsignado.setToolTipText(null);
         }
 
         // Corrector: lo ya corregido, o la corrección aprendida, o el original
@@ -1642,6 +1677,7 @@ public final class VentanaPrincipal extends JFrame {
             memoria.aprenderModelo(actual.getModelo(), modelo);
         }
         if (persistir(actual)) {
+            catalogarSolo(false, null); // los idénticos pendientes, si la opción está activada
             avanzar();
         }
     }
@@ -1664,7 +1700,12 @@ public final class VentanaPrincipal extends JFrame {
             return;
         }
         if (actual.getEstado() == EstadoGrupo.REVISADO) {
-            memoria.olvidar(actual.getNombre(), actual.getMarca(), actual.getModelo());
+            if (autoIdenticos()) {
+                // si no, la catalogación automática le volvería a asignar lo mismo
+                memoria.olvidarIdenticos(actual.getNombre(), actual.getMarca(), actual.getModelo());
+            } else {
+                memoria.olvidar(actual.getNombre(), actual.getMarca(), actual.getModelo());
+            }
         }
         actual.reiniciar();
         actual.setMarcaCorregida(null);
@@ -1750,7 +1791,8 @@ public final class VentanaPrincipal extends JFrame {
         mostrarFinal();
         if (pospuestos > 0 && !modoPospuestos()) {
             int r = JOptionPane.showConfirmDialog(this, "Has terminado todos los pendientes.\n"
-                            + "Quedan " + pospuestos + " grupos pospuestos (dudas). ¿Quieres revisarlos ahora?",
+                            + (pospuestos == 1 ? "Queda 1 grupo pospuesto (duda). ¿Quieres revisarlo ahora?"
+                            : "Quedan " + pospuestos + " grupos pospuestos (dudas). ¿Quieres revisarlos ahora?"),
                     "Pendientes terminados", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if (r == JOptionPane.YES_OPTION) {
                 revisarPospuestos();
@@ -1798,6 +1840,7 @@ public final class VentanaPrincipal extends JFrame {
                 case FILTRO_PENDIENTES: pasa = g.getEstado() == EstadoGrupo.PENDIENTE; break;
                 case FILTRO_POSPUESTOS: pasa = g.getEstado() == EstadoGrupo.POSPUESTO; break;
                 case FILTRO_REVISADOS: pasa = g.getEstado() == EstadoGrupo.REVISADO; break;
+                case FILTRO_AUTOMATICOS: pasa = g.esAutomatico(); break;
                 default: pasa = true;
             }
             if (pasa && !texto.isEmpty()) {
@@ -1935,17 +1978,37 @@ public final class VentanaPrincipal extends JFrame {
         b.append("</div></html>");
         JCheckBox agrupar = new JCheckBox("Separar también por marca y modelo (recomendado)", true);
         agrupar.setToolTipText("Si lo desmarcas, se juntan todos los equipos con el mismo nombre aunque sean de marcas distintas");
+        DialogoAutomatico.Panel auto = new DialogoAutomatico.Panel(opcionesAuto(),
+                configIA.getModo() == ConfigIA.Modo.IA, true);
         JPanel panel = new JPanel(new BorderLayout(0, 10));
-        panel.add(new JLabel(b.toString()), BorderLayout.CENTER);
-        panel.add(agrupar, BorderLayout.SOUTH);
+        panel.add(new JLabel(b.toString()), BorderLayout.NORTH);
+        panel.add(opcionesImportar(agrupar, auto), BorderLayout.CENTER);
         Object[] botones = {"Importar", "Elegir las columnas a mano…", "Cancelar"};
         int r = JOptionPane.showOptionDialog(this, panel, "Importar inventario: " + f.getName(),
                 JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, botones, botones[0]);
         if (r == 0) {
+            guardarAuto(auto.opciones());
             crearProyecto(f, m, agrupar.isSelected());
         } else if (r == 1) {
             mapearInventarioAMano(f);
         }
+    }
+
+    /** «Separar por marca y modelo» y, debajo, las opciones de catalogación automática. */
+    private static JPanel opcionesImportar(JCheckBox agrupar, DialogoAutomatico.Panel auto) {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        agrupar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        p.add(agrupar);
+        p.add(Box.createVerticalStrut(10));
+        JLabel t = Estilo.etiqueta("Catalogación automática (opcional; si no marcas nada, verificas tú cada grupo)",
+                Font.BOLD, 12.5f, Estilo.TEXTO);
+        t.setAlignmentX(Component.LEFT_ALIGNMENT);
+        p.add(t);
+        p.add(Box.createVerticalStrut(4));
+        auto.setAlignmentX(Component.LEFT_ALIGNMENT);
+        p.add(auto);
+        return p;
     }
 
     /** Campos del inventario para elegir las columnas a mano, con los títulos habituales de cada uno. */
@@ -1984,15 +2047,18 @@ public final class VentanaPrincipal extends JFrame {
             return hojas;
         }, hojas -> {
             JCheckBox agrupar = new JCheckBox("Separar también por marca y modelo (recomendado)", true);
+            DialogoAutomatico.Panel auto = new DialogoAutomatico.Panel(opcionesAuto(),
+                    configIA.getModo() == ConfigIA.Modo.IA, true);
             List<DialogoImportacion.Campo> campos = camposInventario();
             DialogoImportacion d = new DialogoImportacion(this, "Importar inventario",
                     "No se han encontrado todas las cabeceras esperadas (Equipo_codiCentro, Equipo_idEquipo, "
                             + "Equipo_nombre…). Indica qué columna contiene cada dato. Se muestran las primeras filas.",
-                    f, hojas, campos, agrupar);
+                    f, hojas, campos, opcionesImportar(agrupar, auto));
             d.setVistaPrevia(true);
             if (!d.mostrar()) {
                 return;
             }
+            guardarAuto(auto.opciones());
             ImportadorInventario.Mapeo m = new ImportadorInventario.Mapeo();
             m.hoja = hojas.indexOf(d.hoja());
             m.filaCabecera = d.filaCabecera();
@@ -2004,12 +2070,20 @@ public final class VentanaPrincipal extends JFrame {
     }
 
     private void crearProyecto(File f, ImportadorInventario.Mapeo m, boolean agrupar) {
+        final long[] auto = new long[2]; // grupos y equipos catalogados solos por ser idénticos
         Espera.ejecutar(this, "Leyendo el inventario " + f.getName() + "…", "filas", avance -> {
             Proyecto p = ImportadorInventario.importar(f, m, agrupar, avance);
             if (p.numEquipos() == 0) {
                 throw new IOException("No hay ningún equipo que catalogar en " + f.getName() + ".\n\n"
                         + "Filas leídas: " + p.getFilasLeidas() + " · de baja: " + p.getDescartadosBaja()
                         + " · con otro valor en Equipo_debaja: " + p.getDescartadosOtros());
+            }
+            if (autoIdenticos()) {
+                avance.fase("Catalogando los idénticos a otros ya catalogados…", null);
+                List<Grupo> l = CatalogacionAutomatica.aplicar(p.getGrupos(), memoria, catalogos,
+                        LocalDateTime.now().format(Almacen.FECHA));
+                auto[0] = l.size();
+                auto[1] = CatalogacionAutomatica.equipos(l);
             }
             avance.fase("Guardando el proyecto…", null);
             p.setNombre(f.getName().replaceFirst("\\.[^.]+$", ""));
@@ -2035,12 +2109,22 @@ public final class VentanaPrincipal extends JFrame {
             b.append("Equipos a catalogar: <b>").append(Estilo.numero(listo.numEquipos())).append("</b>, en <b>")
                     .append(Estilo.numero(listo.getGrupos().size())).append("</b> grupos de equipos iguales y <b>")
                     .append(listo.centros().size()).append("</b> ").append(listo.centros().size() == 1 ? "centro" : "centros")
-                    .append(".<br><br>Empezamos por los grupos con más equipos.</div></html>");
+                    .append(".<br><br>");
+            if (autoIdenticos()) {
+                b.append("<font color='").append(Estilo.hex(Estilo.VERDE)).append("'>Catalogados automáticamente por ser ")
+                        .append("idénticos a otros ya catalogados: <b>").append(Estilo.numero(auto[0])).append("</b>")
+                        .append(auto[0] == 1 ? " grupo (" : " grupos (")
+                        .append(cuantos(auto[1], "equipo", "equipos")).append(").</font> Puedes verlos con el filtro ")
+                        .append("«Catalogados automáticamente» de la cola.<br><br>");
+            }
+            b.append("Empezamos por los grupos con más equipos.</div></html>");
             JOptionPane.showMessageDialog(this, b.toString(), "Proyecto creado", JOptionPane.INFORMATION_MESSAGE);
             if (catalogos.total() == 0) {
                 JOptionPane.showMessageDialog(this, "Recuerda importar también los catálogos oficiales\n"
                                 + "(menú Catálogos → Importar catálogos) para poder buscar los nombres.",
                         "Faltan los catálogos", JOptionPane.INFORMATION_MESSAGE);
+            } else if (asistente != null && configIA.isAceptarAutomatico() && proyecto.contar(EstadoGrupo.PENDIENTE) > 0) {
+                pedirTodasIA(true); // modo IA con aceptación automática: catalogar ya lo más seguro
             }
         });
     }
@@ -2156,6 +2240,7 @@ public final class VentanaPrincipal extends JFrame {
             refrescarProgreso();
             refrescarCola();
             refrescarListas();
+            String auto = catalogarSolo(false, null);
             if (actual != null) {
                 mostrarGrupo(actual, false);
             }
@@ -2180,6 +2265,10 @@ public final class VentanaPrincipal extends JFrame {
                         .append(Estilo.numero(r.gruposEnConflicto)).append("</font><br>");
             }
             b.append("Clasificaciones aprendidas para sugerir: <b>").append(Estilo.numero(r.aprendidas)).append("</b>");
+            if (auto != null) {
+                b.append("<br><br><font color='").append(Estilo.hex(Estilo.VERDE)).append("'>")
+                        .append(Texto.html(auto)).append("</font>");
+            }
             b.append("</div></html>");
             JOptionPane.showMessageDialog(this, b.toString(), "Resultado anterior aplicado",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -2245,13 +2334,15 @@ public final class VentanaPrincipal extends JFrame {
                 return;
             }
             refrescarListas();
+            String auto = catalogarSolo(false, actual);
             if (actual != null) {
                 sugerencias = calcularSugerencias(actual);
                 pintarSugerencias();
             }
             JOptionPane.showMessageDialog(this, "Se han aprendido " + Estilo.numero(aprendidas) + " clasificaciones."
                             + (desconocidas > 0 ? "\n(" + Estilo.numero(desconocidas)
-                            + " no están en los catálogos cargados; se aprenden igualmente.)" : ""),
+                            + " no están en los catálogos cargados; se aprenden igualmente.)" : "")
+                            + (auto != null ? "\n\n" + auto : ""),
                     "Memoria actualizada", JOptionPane.INFORMATION_MESSAGE);
         });
     }
@@ -2273,6 +2364,9 @@ public final class VentanaPrincipal extends JFrame {
                     Files.isDirectory(escritorio) ? escritorio.toString() : System.getProperty("user.home")));
             opcionesExportar.csv = "csv".equals(config.getProperty("formatoExportar"));
         }
+        if (proyectoExportado != proyecto) {
+            opcionesExportar.centros = null; // otro proyecto: otros centros, se proponen todos
+        }
         opcionesExportar.prefijo = "Catalogacion_" + proyecto.getNombre().replaceAll("[\\\\/:*?\"<>|\\s\\p{Cntrl}]+", "_") + "_"
                 + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         Exportador.Opciones o = DialogoExportar.mostrar(this, proyecto, opcionesExportar);
@@ -2280,18 +2374,28 @@ public final class VentanaPrincipal extends JFrame {
             return;
         }
         opcionesExportar = o;
+        proyectoExportado = proyecto;
         config.setProperty("carpetaExportar", o.carpeta.getAbsolutePath());
         config.setProperty("formatoExportar", o.csv ? "csv" : "xlsx");
         almacen.guardarConfig(config);
-        Espera.ejecutar(this, "Generando " + (o.csv ? "los CSV" : "los Excel") + " por centro…", "equipos",
+        Espera.ejecutar(this, "Generando " + (o.csv ? "los CSV" : "los Excel") + (o.centros == null ? " por centro…"
+                        : o.centros.size() == 1 ? " del centro elegido…" : " de los centros elegidos…"), "equipos",
                 avance -> Exportador.exportar(proyecto, o, avance), creados -> {
                     long filas = 0;
                     for (Exportador.Fichero x : creados) {
                         filas += x.getFilas();
                     }
-                    int abrir = JOptionPane.showConfirmDialog(this, "Se han creado " + creados.size()
-                                    + (creados.size() == 1 ? " fichero" : " ficheros") + " (" + Estilo.numero(filas)
-                                    + " equipos) en:\n" + o.carpeta.getAbsolutePath() + "\n\n¿Quieres abrir la carpeta?",
+                    StringBuilder nombres = new StringBuilder();
+                    for (int i = 0; i < creados.size() && i < 12; i++) {
+                        nombres.append("\n   ").append(creados.get(i).getFichero().getName());
+                    }
+                    if (creados.size() > 12) {
+                        nombres.append("\n   …");
+                    }
+                    int abrir = JOptionPane.showConfirmDialog(this, (creados.size() == 1 ? "Se ha creado 1 fichero"
+                                    : "Se han creado " + creados.size() + " ficheros") + " (" + cuantos(filas, "equipo", "equipos")
+                                    + ") en:\n" + o.carpeta.getAbsolutePath() + nombres
+                                    + "\n\n¿Quieres abrir la carpeta?",
                             "Exportado", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
                     if (abrir == JOptionPane.YES_OPTION) {
                         abrirEnSistema(o.carpeta);
@@ -2487,8 +2591,10 @@ public final class VentanaPrincipal extends JFrame {
             btnModo.setForeground(Estilo.TEXTO_SUAVE);
         }
         for (JMenuItem m : accionesIA) {
-            m.setEnabled(asistente != null || m.getText().startsWith("Borrar") || m.getText().startsWith("Consumo"));
+            m.setEnabled(asistente != null || m.getText().startsWith("Borrar") || m.getText().startsWith("Consumo")
+                    || m.getText().startsWith("Aceptar solas"));
         }
+        actualizarAuto();
     }
 
     private void abrirModo() {
@@ -2499,13 +2605,18 @@ public final class VentanaPrincipal extends JFrame {
 
     /** Crea el asistente de IA según la configuración (o lo quita en modo manual). */
     private void prepararIA() {
+        boolean habiaIA = asistente != null || pausaIA != null;
         pausaIA = null;
         erroresIA.clear();
         asistente = null;
+        if (habiaIA && configIA.getModo() != ConfigIA.Modo.IA) {
+            lblEstadoBarra.setText("Modo manual: la IA ya no propone nada.");
+        }
         if (configIA.getModo() == ConfigIA.Modo.IA) {
             if (configIA.estaListo(configIA.getProveedor())) {
                 asistente = new AsistenteIA(ClienteIA.desde(configIA, configIA.getProveedor()), catalogos, memoria);
                 lblEstadoBarra.setText("Modo IA con " + configIA.resumen() + ". Las propuestas se guardan en el proyecto.");
+                catalogarSolo(true, actual); // propuestas guardadas que ya llegan al porcentaje (si la opción está activada)
             } else {
                 pausaIA = "falta la clave o el modelo del servicio (menú IA → Modo de trabajo).";
             }
@@ -2710,6 +2821,9 @@ public final class VentanaPrincipal extends JFrame {
                     + (c != null && c.getTokensEntrada() > 0 ? "  ·  " + Estilo.numero(c.getTokensEntrada() + c.getTokensSalida())
                     + " tokens en esta sesión" : ""));
         }
+        if (error == null && configIA.isAceptarAutomatico()) {
+            catalogarSolo(true, actual); // las más seguras se aceptan solas (no la del grupo en pantalla)
+        }
         if (actual != null && lote.contains(actual)) {
             sugerencias = calcularSugerencias(actual);
             pintarSugerencias();
@@ -2775,6 +2889,14 @@ public final class VentanaPrincipal extends JFrame {
 
     /** Pide propuestas para todos los grupos pendientes (y pospuestos) que no tengan. */
     private void pedirTodasIA() {
+        pedirTodasIA(false);
+    }
+
+    /**
+     * @param trasImportar se llama sola al importar un inventario con la aceptación
+     *                     automática activada (cambia solo el texto de la confirmación)
+     */
+    private void pedirTodasIA(boolean trasImportar) {
         if (proyecto == null || asistente == null) {
             JOptionPane.showMessageDialog(this, proyecto == null ? "Primero abre o crea un proyecto."
                     : "Activa el modo IA en el menú IA → Modo de trabajo.", "IA", JOptionPane.INFORMATION_MESSAGE);
@@ -2792,8 +2914,24 @@ public final class VentanaPrincipal extends JFrame {
             }
         }
         if (faltan.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Todos los grupos pendientes tienen ya propuesta de la IA.", "IA",
-                    JOptionPane.INFORMATION_MESSAGE);
+            if (trasImportar) {
+                // Las propuestas ya han llegado (las pidió la IA al enseñar el primer grupo): se aceptan las seguras
+                boolean eraPendiente = actual != null && actual.getEstado() == EstadoGrupo.PENDIENTE;
+                String hecho = catalogarSolo(true, null);
+                if (actual != null && eraPendiente && actual.getEstado() != EstadoGrupo.PENDIENTE) {
+                    avanzar();
+                }
+                JOptionPane.showMessageDialog(this, "<html><div style='width:430px'>La IA ya ha propuesto un término para "
+                                + "todos los grupos pendientes.<br><br><font color='" + Estilo.hex(Estilo.VERDE) + "'>"
+                                + (hecho != null ? Texto.html(hecho) : "Ninguna propuesta llega al "
+                                + configIA.getUmbralAutomatico() + " % de confianza: no se ha aceptado ninguna sola.")
+                                + "</font><br><br>Revisa el resto grupo a grupo (" + Estilo.atajo("I")
+                                + " acepta la propuesta de la IA).</div></html>", "Propuestas de la IA",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Todos los grupos pendientes tienen ya propuesta de la IA.", "IA",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
             return;
         }
         int lote = configIA.getLote(asistente.getCliente().getProveedor());
@@ -2802,14 +2940,21 @@ public final class VentanaPrincipal extends JFrame {
         catalogador.ia.ProveedorIA.Categoria cat = cli.getProveedor().getCategoria();
         boolean gratis = cat == catalogador.ia.ProveedorIA.Categoria.GRATUITA
                 || cat == catalogador.ia.ProveedorIA.Categoria.CON_VERSION_GRATUITA;
-        int r = JOptionPane.showConfirmDialog(this, "<html><div style='width:460px'>Se pedirá a <b>"
+        boolean auto = configIA.isAceptarAutomatico();
+        int umbralAuto = configIA.getUmbralAutomatico();
+        int r = JOptionPane.showConfirmDialog(this, "<html><div style='width:460px'>"
+                        + (trasImportar ? "<b>Catalogación automática con la IA.</b> " : "") + "Se pedirá a <b>"
                         + Texto.html(cli.descripcion()) + "</b> una propuesta para <b>" + Estilo.numero(faltan.size())
-                        + "</b> grupos (" + Estilo.numero(equipos) + " equipos), en unas <b>" + Estilo.numero(consultas)
+                        + "</b>" + (faltan.size() == 1 ? " grupo (" : " grupos (") + cuantos(equipos, "equipo", "equipos")
+                        + "), en unas <b>" + Estilo.numero(consultas)
                         + "</b> consultas de " + lote + " grupos.<br><br>"
                         + (gratis && !cli.getProveedor().isLocal() ? "Con un servicio gratuito puede agotarse el límite diario: "
                         + "lo que esté hecho queda guardado y se puede seguir otro día.<br><br>" : "")
-                        + "Las propuestas <b>no se aplican solas</b>: después las revisas grupo a grupo (o aceptas en bloque "
-                        + "las más seguras). ¿Empezar?</div></html>",
+                        + (auto ? "Las propuestas con al menos <b>" + umbralAuto + " % de confianza se aceptarán solas</b> "
+                        + "(opción de catalogación automática); el resto las revisas grupo a grupo. Si cancelas, lo recibido "
+                        + "hasta ese momento se queda y se acepta igual."
+                        : "Las propuestas <b>no se aplican solas</b>: después las revisas grupo a grupo (o aceptas en bloque "
+                        + "las más seguras).") + " ¿Empezar?</div></html>",
                 "Pedir propuestas a la IA", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (r != JOptionPane.OK_OPTION) {
             return;
@@ -2865,6 +3010,8 @@ public final class VentanaPrincipal extends JFrame {
             res.ms = (System.nanoTime() - t0) / 1_000_000;
             return res;
         }, res -> {
+            boolean eraPendiente = actual != null && actual.getEstado() == EstadoGrupo.PENDIENTE;
+            String aceptadas = auto ? catalogarSolo(true, null) : null;
             StringBuilder b = new StringBuilder("<html><div style='width:430px'>");
             b.append(res.cancelado ? "Cancelado. " : "").append("Propuestas recibidas: <b>")
                     .append(Estilo.numero(res.conTermino)).append("</b> con término");
@@ -2880,9 +3027,16 @@ public final class VentanaPrincipal extends JFrame {
                 b.append("<br><br><font color='").append(Estilo.hex(Estilo.ROJO)).append("'>Se ha parado por un error:</font> ")
                         .append(Texto.html(res.fallo).replace("\n", "<br>"));
             }
+            if (auto) {
+                b.append("<br><br><font color='").append(Estilo.hex(Estilo.VERDE)).append("'>")
+                        .append(aceptadas != null ? Texto.html(aceptadas) : "Ninguna propuesta llega al " + umbralAuto
+                                + " % de confianza: no se ha aceptado ninguna sola.").append("</font>");
+            }
             b.append("<br><br>Revisa las propuestas grupo a grupo (").append(Estilo.atajo("I"))
                     .append(" acepta la de la IA) o usa «IA → Aceptar en bloque las propuestas más seguras».</div></html>");
-            if (actual != null) {
+            if (actual != null && eraPendiente && actual.getEstado() != EstadoGrupo.PENDIENTE) {
+                avanzar();
+            } else if (actual != null) {
                 sugerencias = calcularSugerencias(actual);
                 pintarSugerencias();
                 pintarEstadoIA();
@@ -2894,18 +3048,10 @@ public final class VentanaPrincipal extends JFrame {
 
     /** Grupos pendientes cuya propuesta de la IA tiene al menos esa confianza (y existe en el catálogo). */
     private List<Grupo> seguros(int umbral) {
-        List<Grupo> l = new ArrayList<>();
         if (proyecto == null || propuestas == null) {
-            return l;
+            return new ArrayList<>();
         }
-        for (Grupo g : proyecto.getGrupos()) {
-            PropuestaIA p = g.getEstado() == EstadoGrupo.PENDIENTE ? propuestas.get(g.getClave()) : null;
-            if (p != null && p.tieneTermino() && p.getConfianza() >= umbral
-                    && catalogos.porCodigo(p.getLista(), p.getCodigo()) != null) {
-                l.add(g);
-            }
-        }
-        return l;
+        return AceptacionIA.seguros(proyecto.getGrupos(), propuestas, catalogos, umbral);
     }
 
     /** Marca como revisados, de una vez, los grupos pendientes con propuesta muy segura de la IA. */
@@ -2924,8 +3070,8 @@ public final class VentanaPrincipal extends JFrame {
             for (Grupo g : l) {
                 eq += g.getEquipos();
             }
-            cuenta.setText("<html>Se aceptarán <b>" + Estilo.numero(l.size()) + "</b> grupos (" + Estilo.numero(eq)
-                    + " equipos).</html>");
+            cuenta.setText("<html>Se aceptarán <b>" + Estilo.numero(l.size()) + "</b>" + (l.size() == 1 ? " grupo (" : " grupos (")
+                    + cuantos(eq, "equipo", "equipos") + ").</html>");
         };
         umbral.addChangeListener(e -> contar.run());
         contar.run();
@@ -2950,15 +3096,8 @@ public final class VentanaPrincipal extends JFrame {
             return;
         }
         String fecha = LocalDateTime.now().format(Almacen.FECHA);
-        long eq = 0;
-        for (Grupo g : l) {
-            PropuestaIA p = propuestas.get(g.getClave());
-            g.asignar(p.getLista(), p.getCodigo(), p.getNombreOficial(), "IA en bloque: " + p.getFuente() + " ("
-                    + p.getConfianza() + "% de confianza)", fecha);
-            memoria.aprender(g.getNombre(), g.getMarca(), g.getModelo(), p.getLista(), p.getCodigo(), p.getNombreOficial(),
-                    fecha);
-            eq += g.getEquipos();
-        }
+        long eq = CatalogacionAutomatica.equipos(l);
+        AceptacionIA.aceptar(l, propuestas, memoria, AceptacionIA.EN_BLOQUE, fecha);
         try {
             almacen.registrarCambios(proyecto, l);
             memoria.guardarCambios();
@@ -2972,13 +3111,15 @@ public final class VentanaPrincipal extends JFrame {
         refrescarProgreso();
         refrescarCola();
         refrescarListas();
+        String auto = catalogarSolo(false, null); // y sus idénticos, si la opción está activada
         if (actual != null && actual.getEstado() == EstadoGrupo.REVISADO) {
             avanzar();
         } else if (actual != null) {
             mostrarGrupo(actual, false);
         }
-        JOptionPane.showMessageDialog(this, Estilo.numero(l.size()) + " grupos (" + Estilo.numero(eq)
-                        + " equipos) marcados como revisados con la propuesta de la IA.", "Aceptar en bloque",
+        JOptionPane.showMessageDialog(this, cuantos(l.size(), "grupo", "grupos") + " (" + cuantos(eq, "equipo", "equipos")
+                        + (l.size() == 1 ? ") marcado como revisado" : ") marcados como revisados") + " con la propuesta de la IA."
+                        + (auto != null ? "\n\n" + auto : ""), "Aceptar en bloque",
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -3024,6 +3165,197 @@ public final class VentanaPrincipal extends JFrame {
     }
 
     // =====================================================================
+    // Catalogación automática (opcional, desactivada por defecto)
+    // =====================================================================
+
+    /** true si está activada «Catalogar sin preguntar los equipos idénticos a otros ya catalogados». */
+    private boolean autoIdenticos() {
+        return "true".equals(config.getProperty(CONFIG_AUTO_IDENTICOS));
+    }
+
+    private DialogoAutomatico.Opciones opcionesAuto() {
+        return new DialogoAutomatico.Opciones(autoIdenticos(), configIA.isAceptarAutomatico(),
+                configIA.getUmbralAutomatico());
+    }
+
+    private void guardarAuto(DialogoAutomatico.Opciones o) {
+        config.setProperty(CONFIG_AUTO_IDENTICOS, String.valueOf(o.identicos));
+        almacen.guardarConfig(config);
+        configIA.setAceptarAutomatico(o.ia);
+        configIA.setUmbralAutomatico(o.umbral);
+        try {
+            configIA.guardar();
+        } catch (IOException e) {
+            lblEstadoBarra.setText("No se pudo guardar la configuración de la IA: " + e.getMessage());
+        }
+        actualizarAuto();
+    }
+
+    /** Texto del botón de la cabecera: qué se cataloga solo. */
+    private void actualizarAuto() {
+        boolean idem = autoIdenticos();
+        boolean ia = configIA.isAceptarAutomatico() && configIA.getModo() == ConfigIA.Modo.IA;
+        if (!idem && !ia) {
+            btnAuto.setText("Catalogación automática: no  ▾");
+            btnAuto.setForeground(Estilo.TEXTO_SUAVE);
+            btnAuto.setToolTipText("Desactivada: no se cataloga nada sin que lo verifiques. Clic para ver las opciones "
+                    + "(los idénticos a otros ya catalogados y, en modo IA, las propuestas más seguras)");
+        } else {
+            btnAuto.setText("Catalogación automática: " + (idem ? "idénticos" : "") + (idem && ia ? " + " : "")
+                    + (ia ? "IA ≥ " + configIA.getUmbralAutomatico() + " %" : "") + "  ▾");
+            btnAuto.setForeground(Estilo.VERDE);
+            btnAuto.setToolTipText("Se catalogan sin preguntar " + (idem ? "los equipos idénticos a otros ya catalogados" : "")
+                    + (idem && ia ? " y " : "") + (ia ? "las propuestas de la IA con al menos "
+                    + configIA.getUmbralAutomatico() + " % de confianza" : "") + ". Clic para cambiarlo.");
+        }
+    }
+
+    /**
+     * Aplica la catalogación automática que esté activada a los grupos pendientes del
+     * proyecto, salvo {@code excepto} (el que se está viendo): primero las propuestas de
+     * la IA más seguras (si {@code ia}) y después los idénticos a otros ya catalogados.
+     * Lo guarda y devuelve un resumen, o null si no ha cambiado nada.
+     */
+    private String catalogarSolo(boolean ia, Grupo excepto) {
+        if (proyecto == null) {
+            return null;
+        }
+        boolean conIA = ia && asistente != null && propuestas != null && configIA.isAceptarAutomatico();
+        boolean conIdenticos = autoIdenticos();
+        if (!conIA && !conIdenticos) {
+            return null;
+        }
+        String fecha = LocalDateTime.now().format(Almacen.FECHA);
+        List<Grupo> grupos = new ArrayList<>(proyecto.getGrupos());
+        if (excepto != null) {
+            grupos.remove(excepto);
+        }
+        List<Grupo> deIA = conIA ? AceptacionIA.seguros(grupos, propuestas, catalogos, configIA.getUmbralAutomatico())
+                : Collections.<Grupo>emptyList();
+        AceptacionIA.aceptar(deIA, propuestas, memoria, AceptacionIA.AUTOMATICA, fecha);
+        List<Grupo> identicos = conIdenticos ? CatalogacionAutomatica.aplicar(grupos, memoria, catalogos, fecha)
+                : Collections.<Grupo>emptyList();
+        if (deIA.isEmpty() && identicos.isEmpty()) {
+            return null;
+        }
+        List<Grupo> cambiados = new ArrayList<>(deIA);
+        cambiados.addAll(identicos);
+        try {
+            almacen.registrarCambios(proyecto, cambiados);
+            memoria.guardarCambios();
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "¡No se ha podido guardar!\n\n" + e.getMessage(), "Error al guardar",
+                    JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+        refrescarProgreso();
+        refrescarCola();
+        refrescarListas();
+        StringBuilder b = new StringBuilder("✔ Catalogados automáticamente: ");
+        if (!identicos.isEmpty()) {
+            b.append(Estilo.numero(identicos.size())).append(identicos.size() == 1 ? " grupo idéntico" : " grupos idénticos")
+                    .append(" a otros ya catalogados (").append(cuantos(CatalogacionAutomatica.equipos(identicos), "equipo",
+                    "equipos")).append(")");
+        }
+        if (!deIA.isEmpty()) {
+            b.append(identicos.isEmpty() ? "" : " y ").append(Estilo.numero(deIA.size()))
+                    .append(deIA.size() == 1 ? " grupo" : " grupos").append(" con propuesta de la IA de al menos ")
+                    .append(configIA.getUmbralAutomatico()).append(" % (")
+                    .append(cuantos(CatalogacionAutomatica.equipos(deIA), "equipo", "equipos")).append(")");
+        }
+        b.append(".");
+        lblEstadoBarra.setText(b + "   ·   Filtro «Catalogados automáticamente» para revisarlos.");
+        return b.toString();
+    }
+
+    /** «1 equipo», «2 equipos», «1.250 equipos». */
+    private static String cuantos(long n, String uno, String varios) {
+        return Estilo.numero(n) + " " + (n == 1 ? uno : varios);
+    }
+
+    /** Lo que se catalogaría solo ahora mismo con esas opciones (para el diálogo de opciones). */
+    private String previstoAuto(DialogoAutomatico.Opciones o) {
+        if (proyecto == null) {
+            return null;
+        }
+        List<Grupo> grupos = proyecto.getGrupos();
+        int idem = o.identicos ? CatalogacionAutomatica.candidatos(grupos, memoria, catalogos).size() : 0;
+        int ia = o.ia && asistente != null && propuestas != null
+                ? AceptacionIA.seguros(grupos, propuestas, catalogos, o.umbral).size() : 0;
+        if (idem == 0 && ia == 0) {
+            return "<font color='" + Estilo.hex(Estilo.TEXTO_SUAVE) + "'>En el proyecto abierto no hay ahora nada que "
+                    + "catalogar solo con estas opciones.</font>";
+        }
+        return "En el proyecto abierto, al aceptar se catalogarán ya <b>"
+                + (idem > 0 ? Estilo.numero(idem) + (idem == 1 ? " grupo idéntico" : " grupos idénticos")
+                + " a otros ya catalogados" : "")
+                + (idem > 0 && ia > 0 ? "</b> y <b>" : "")
+                + (ia > 0 ? Estilo.numero(ia) + (ia == 1 ? " grupo" : " grupos") + " con propuesta de la IA de al menos "
+                + o.umbral + " %" : "") + "</b>.";
+    }
+
+    /** Revisión → Catalogación automática (opciones)… */
+    private void abrirAutomatico() {
+        DialogoAutomatico.Opciones o = DialogoAutomatico.mostrar(this, opcionesAuto(),
+                configIA.getModo() == ConfigIA.Modo.IA, this::previstoAuto);
+        if (o == null) {
+            return;
+        }
+        guardarAuto(o);
+        String hecho = catalogarSolo(true, null); // lo pide la persona: también el grupo que está viendo
+        if (actual != null) {
+            mostrarGrupo(actual, false); // si se ha catalogado, se ve «✔ Catalogado automáticamente»
+        }
+        if (hecho != null) {
+            JOptionPane.showMessageDialog(this, hecho + "\n\nPuedes revisarlos con el filtro «Catalogados "
+                    + "automáticamente» de la cola.", "Catalogación automática", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    /** Revisión → Catalogar ahora los idénticos a otros ya catalogados (aunque la opción esté desactivada). */
+    private void catalogarIdenticosAhora() {
+        if (proyecto == null) {
+            JOptionPane.showMessageDialog(this, "Primero abre o crea un proyecto.", "Catalogar idénticos",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        List<Grupo> l = CatalogacionAutomatica.candidatos(proyecto.getGrupos(), memoria, catalogos);
+        if (l.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No hay grupos pendientes idénticos (100 %: mismo nombre, marca y modelo)\n"
+                    + "a otros ya catalogados.", "Catalogar idénticos", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (JOptionPane.showConfirmDialog(this, "<html><div style='width:430px'>" + (l.size() == 1 ? "Hay <b>1</b> grupo pendiente ("
+                        : "Hay <b>" + Estilo.numero(l.size()) + "</b> grupos pendientes (")
+                        + cuantos(CatalogacionAutomatica.equipos(l), "equipo", "equipos") + ") "
+                        + "idénticos a otros ya catalogados: el mismo nombre, la misma marca y el mismo modelo "
+                        + "(coincidencia del 100 %).<br><br>Se les asignará el mismo código y nombre, con el origen "
+                        + "«Automático». Podrás verlos con el filtro «Catalogados automáticamente» y devolver cualquiera "
+                        + "a pendiente. ¿Catalogarlos ahora?</div></html>", "Catalogar idénticos",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        String fecha = LocalDateTime.now().format(Almacen.FECHA);
+        List<Grupo> cambiados = CatalogacionAutomatica.aplicar(l, memoria, catalogos, fecha);
+        try {
+            almacen.registrarCambios(proyecto, cambiados);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "¡No se ha podido guardar!\n\n" + e.getMessage(), "Error al guardar",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        refrescarProgreso();
+        refrescarCola();
+        lblEstadoBarra.setText("✔ Catalogados " + cuantos(cambiados.size(), "grupo idéntico", "grupos idénticos")
+                + " a otros ya catalogados (" + cuantos(CatalogacionAutomatica.equipos(cambiados), "equipo", "equipos") + ").");
+        if (actual != null && actual.getEstado() == EstadoGrupo.REVISADO && cambiados.contains(actual)) {
+            avanzar();
+        } else if (actual != null) {
+            mostrarGrupo(actual, false);
+        }
+    }
+
+    // =====================================================================
     // Ayuda y salida
     // =====================================================================
 
@@ -3043,7 +3375,7 @@ public final class VentanaPrincipal extends JFrame {
         atajos.put(Estilo.atajo("M"), "Ir a la marca (Tab para pasar al modelo)");
         atajos.put(Estilo.atajo("⇧M"), "Ir al modelo");
         atajos.put(Estilo.atajo("J"), "Saltar al siguiente pendiente sin guardar");
-        atajos.put(Estilo.atajo("E"), "Exportar el resultado (Excel o CSV, uno por centro)");
+        atajos.put(Estilo.atajo("E"), "Exportar el resultado (Excel o CSV por centro: todos o los que elijas)");
         atajos.put("Doble clic", "En un resultado: asignarlo y guardar");
         StringBuilder h = new StringBuilder("<html><table cellpadding='4'>");
         for (Map.Entry<String, String> e : atajos.entrySet()) {
@@ -3071,9 +3403,15 @@ public final class VentanaPrincipal extends JFrame {
                 + "(gratuita, con versión gratuita o de pago: solo hay que pegar la clave API). La IA elige entre los "
                 + "términos parecidos de los catálogos y su propuesta aparece como sugerencia (" + Estilo.atajo("I")
                 + " para aceptarla). Nunca se le envían el centro ni el identificador de los equipos.</p><br>"
-                + "<p><b>5. Guardado.</b> Cada acción se guarda al instante: si el programa se cierra, no se pierde nada.</p><br>"
-                + "<p><b>6. Resultado.</b> Archivo → Exportar → Resultado: un Excel o CSV por centro con "
-                + "Equipo_codiCentro, Equipo_idEquipo, CÓDIGO GMDN y el nombre.</p>"
+                + "<p><b>5. Catalogación automática (opcional).</b> Por defecto no se cataloga nada sin que lo "
+                + "verifiques. En Revisión → Catalogación automática (o al importar el inventario) puedes activar que "
+                + "los equipos <b>idénticos</b> a otros ya catalogados (mismo nombre, marca y modelo: 100 %) se cataloguen "
+                + "solos, y en modo IA que se acepten solas las propuestas con al menos un porcentaje de confianza. "
+                + "Lo catalogado así se ve con el filtro «Catalogados automáticamente».</p><br>"
+                + "<p><b>6. Guardado.</b> Cada acción se guarda al instante: si el programa se cierra, no se pierde nada.</p><br>"
+                + "<p><b>7. Resultado.</b> Archivo → Exportar → Resultado: un Excel o CSV por centro con "
+                + "Equipo_codiCentro, Equipo_idEquipo, CÓDIGO GMDN y el nombre; puedes elegir qué centros generar "
+                + "(uno, varios o todos).</p>"
                 + "</div></html>";
         JOptionPane.showMessageDialog(this, t, "Cómo funciona", JOptionPane.PLAIN_MESSAGE);
     }

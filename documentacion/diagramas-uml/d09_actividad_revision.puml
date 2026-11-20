@@ -67,6 +67,13 @@ endif
 y marca/modelo → corrección;
 :Anotar el cambio y lo aprendido
 en sus diarios (forzados a disco);
+if (¿Opción «catalogar sin preguntar
+los idénticos» activada?) then (sí)
+  :Catalogar con el mismo término los grupos
+  PENDIENTES idénticos a este (RN-19),
+  con el origen «Automático», y guardarlos;
+else (no, por defecto)
+endif
 :Pasar al siguiente pendiente;
 stop
 @enduml

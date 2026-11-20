@@ -10,6 +10,7 @@ import catalogador.modelo.TipoLista;
 
 import javax.imageio.ImageIO;
 import javax.swing.AbstractButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -60,7 +61,16 @@ public final class CapturasManual {
     static String rutaBase;
     static final String RUTA_WINDOWS = "C:\\Users\\Ana\\Catalogador";
 
-    public static void main(String[] a) throws Exception {
+    public static void main(String[] a) {
+        try {
+            recorrer(a);
+        } catch (Throwable e) {
+            e.printStackTrace();
+            System.exit(1); // si no, las ventanas abiertas mantienen vivo el programa
+        }
+    }
+
+    static void recorrer(String[] a) throws Exception {
         salida = Paths.get(a[0]);
         Files.createDirectories(salida);
         File catalogos = new File(a[1]);
@@ -236,6 +246,12 @@ public final class CapturasManual {
         JDialog exp = esperarDialogo("Exportar");
         dormir(500);
         capturar(exp, "dlg_exportar");
+        pulsar(exp, "Ninguno");
+        JTable ficheros = (JTable) campo(exp, "tablaFicheros");
+        edt(() -> ficheros.setValueAt(Boolean.TRUE, 1, 0));
+        dormir(400);
+        capturar(exp, "dlg_exportar_uno");
+        apuntar("exportar uno", textoDe(exp));
         pulsar(exp, "Cancelar");
         esperarCerrado(exp);
         async(() -> llamar(v, "mostrarAtajos"));
@@ -427,12 +443,160 @@ public final class CapturasManual {
 
         apuntar("progreso", p.contar(EstadoGrupo.REVISADO) + " revisados, " + p.contar(EstadoGrupo.POSPUESTO)
                 + " pospuestos de " + p.getGrupos().size());
+
+        // ============================================================ 15. Catalogación automática (versión 3.2)
+        File catPrueba = new File(datosPrueba, "Catalogos_PRUEBA.xlsx");
+        File invAuto = new File(datosPrueba, "Inventario_PRUEBA_automatico.xlsx");
+        if (catPrueba.exists() && invAuto.exists()) {
+            catalogacionAutomatica(catPrueba, invAuto, urlIA, inventario);
+        }
         log.close();
         System.out.println("Capturas terminadas en " + salida);
         System.exit(0);
     }
 
     // ------------------------------------------------------------------ pasos compuestos
+
+    /**
+     * Catalogación automática con el ejemplo de la «Hoja de mejoras del programa»: en modo
+     * manual se cataloga a mano la cama HILL-ROM y se activa la opción (la idéntica se
+     * cataloga sola); después, en modo IA, se vuelve a importar el inventario de demostración
+     * (como si fuera el del mes siguiente) con las dos opciones activadas.
+     */
+    static void catalogacionAutomatica(File catPrueba, File invAuto, String urlIA, File demo) throws Exception {
+        // Modo manual
+        async(() -> llamar(v, "abrirModo"));
+        JDialog dm = esperarDialogo("Modo de trabajo");
+        edt(() -> ((DialogoModo) dm).prepararCaptura(false, "personalizado", null));
+        pulsar(dm, "Aceptar");
+        esperarCerrado(dm);
+        // Catálogo de prueba (incluye el GMDN 34870 del ejemplo) e inventario «posterior», sin la opción
+        async(() -> llamar(v, "importarCatalogos", File.class, catPrueba));
+        JDialog conf = esperarDialogo("Importar catálogos");
+        pulsar(conf, "Aceptar");
+        JDialog fin = esperarDialogo("Catálogos importados");
+        pulsar(fin, "Aceptar");
+        async(() -> llamar(v, "importarInventario", File.class, invAuto));
+        JDialog inv = esperarDialogo("Importar inventario");
+        pulsar(inv, "Importar");
+        JDialog res = esperarDialogo("Proyecto creado", 60000);
+        apuntar("auto · sin la opción", textoDe(res));
+        pulsar(res, "Aceptar");
+        dormir(600);
+        Proyecto pa = (Proyecto) campo(v, "proyecto");
+        Grupo cama = buscarGrupo(pa, g -> g.getMarca().equals("HILL-ROM"));
+        Grupo camaMin = buscarGrupo(pa, g -> g.getMarca().equals("Hill-Rom"));
+        // Se cataloga a mano la cama del ejemplo (GMDN 34870)
+        mostrar(cama);
+        edt(() -> llamar(v, "cambiarLista", TipoLista.class, TipoLista.GMDN, boolean.class, true));
+        JTextField buscar = (JTextField) campo(v, "txtBuscar");
+        JTable resultados = (JTable) campo(v, "tablaResultados");
+        escribir(buscar, "cama hospitalaria");
+        esperar(() -> resultados.getRowCount() > 0, 5000);
+        edt(() -> resultados.setRowSelectionInterval(0, 0));
+        dormir(500);
+        capturar(v, "auto_cama_manual");
+        edt(() -> llamar(v, "guardar"));
+        dormir(600);
+        apuntar("auto · cama", cama.getEstado() + " " + cama.getCodigo() + " · " + cama.getNombreOficial());
+        // Sin la opción, la idéntica sale al 100 % pero hay que aceptarla
+        mostrar(camaMin);
+        dormir(300);
+        capturar(v, "sug_100");
+        apuntar("auto · idéntica sin la opción", camaMin.getEstado().toString());
+        // Se activa la opción: la idéntica se cataloga sola
+        async(() -> llamar(v, "abrirAutomatico"));
+        JDialog da = esperarDialogo("Catalogación automática");
+        JCheckBox idem = (JCheckBox) buscarComponente(da, JCheckBox.class,
+                c -> c.getText().startsWith("Catalogar sin preguntar"));
+        edt(idem::doClick);
+        dormir(500);
+        capturar(da, "dlg_automatico");
+        apuntar("auto · opciones", textoDe(da));
+        pulsar(da, "Aceptar");
+        esperarCerrado(da);
+        JDialog hecho = esperarDialogo("Catalogación automática");
+        apuntar("auto · hecho", textoDe(hecho));
+        capturar(hecho, "dlg_automatico_hecho");
+        pulsar(hecho, "Aceptar");
+        esperarCerrado(hecho);
+        @SuppressWarnings("unchecked")
+        JComboBox<String> filtro = (JComboBox<String>) campo(v, "cmbFiltroCola");
+        edt(() -> filtro.setSelectedIndex(3));
+        dormir(300);
+        mostrar(camaMin);
+        capturar(v, "cola_automaticos");
+        apuntar("auto · idéntica con la opción", camaMin.getEstado() + " " + camaMin.getCodigo() + " · "
+                + camaMin.getOrigen());
+        edt(() -> filtro.setSelectedIndex(0));
+
+        // Modo IA: el mismo inventario, importado con las dos opciones
+        async(() -> llamar(v, "abrirModo"));
+        JDialog dm2 = esperarDialogo("Modo de trabajo");
+        edt(() -> ((DialogoModo) dm2).prepararCaptura(true, "personalizado", null));
+        JTextField url = (JTextField) buscarComponente(dm2, JTextField.class, c -> !(c instanceof JPasswordField)
+                && c.isEditable() && c.getText().startsWith("http"));
+        edt(() -> url.setText(urlIA));
+        @SuppressWarnings("unchecked")
+        JComboBox<String> modelos = (JComboBox<String>) campo(dm2, "cmbModelo");
+        edt(() -> modelos.getEditor().setItem("modelo-simulado"));
+        pulsar(dm2, "Aceptar");
+        esperarCerrado(dm2);
+        async(() -> llamar(v, "importarInventario", File.class, demo));
+        JDialog inv2 = esperarDialogo("Importar inventario");
+        JCheckBox conIA = (JCheckBox) buscarComponente(inv2, JCheckBox.class, c -> c.getText().startsWith("Modo IA"));
+        edt(conIA::doClick);
+        javax.swing.JSpinner umbral = (javax.swing.JSpinner) buscarComponente(inv2, javax.swing.JSpinner.class, c -> true);
+        edt(() -> umbral.setValue(85));
+        dormir(400);
+        capturar(inv2, "dlg_inventario_auto");
+        pulsar(inv2, "Importar");
+        JDialog res2 = esperarDialogo("Proyecto creado", 180000);
+        apuntar("auto · resumen", textoDe(res2));
+        capturar(res2, "dlg_resumen_auto");
+        pulsar(res2, "Aceptar");
+        JDialog pt = esperarDialogo("Pedir propuestas a la IA");
+        apuntar("auto · pedir", textoDe(pt));
+        capturar(pt, "dlg_pedir_auto");
+        pulsar(pt, "Aceptar");
+        JDialog prog = esperarDialogo("Un momento");
+        dormir(2500);
+        capturar(prog, "dlg_pedir_auto_progreso");
+        JDialog fin2 = esperarDialogo("Propuestas de la IA", 900_000);
+        apuntar("auto · ia", textoDe(fin2));
+        capturar(fin2, "dlg_pedir_auto_fin");
+        pulsar(fin2, "Aceptar");
+        dormir(600);
+        Proyecto pb = (Proyecto) campo(v, "proyecto");
+        edt(() -> filtro.setSelectedIndex(3));
+        dormir(400);
+        Grupo auto = buscarGrupo(pb, g -> g.esAutomatico() && g.getOrigen().startsWith(Grupo.ORIGEN_IA_AUTOMATICA));
+        if (auto != null) {
+            mostrar(auto);
+        }
+        capturar(v, "trabajo_auto");
+        apuntar("auto · proyecto", pb.contar(EstadoGrupo.REVISADO) + " revisados (" + pb.getGrupos().stream()
+                .filter(Grupo::esAutomatico).count() + " automáticos) de " + pb.getGrupos().size());
+        edt(() -> filtro.setSelectedIndex(0));
+        // Exportar solo un centro
+        async(() -> llamar(v, "exportar"));
+        JDialog exp = esperarDialogo("Exportar");
+        pulsar(exp, "Ninguno");
+        JTable ficheros = (JTable) campo(exp, "tablaFicheros");
+        edt(() -> {
+            for (int i = 0; i < ficheros.getRowCount(); i++) {
+                if ("GAIPU".equals(ficheros.getValueAt(i, 1))) {
+                    ficheros.setValueAt(Boolean.TRUE, i, 0);
+                }
+            }
+        });
+        dormir(300);
+        pulsar(exp, "Exportar");
+        JDialog ok = esperarDialogo("Exportado", 180000);
+        apuntar("auto · exportado", textoDe(ok));
+        capturar(ok, "dlg_exportado");
+        pulsar(ok, "No");
+    }
 
     /** Busca un grupo pendiente por nombre, escribe la búsqueda y guarda el primer resultado. */
     static void clasificarPorNombre(String empieza, String consulta) throws Exception {

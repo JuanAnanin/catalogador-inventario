@@ -10,6 +10,7 @@ class "config.properties" as CFG {
   ultimoProyecto
   ultimaCarpeta · carpetaExportar
   formatoExportar
+  catalogarIdenticos (3.2; false por defecto)
 }
 class "ia.properties  (solo lo lee su dueño)" as IAP {
   modo = MANUAL | IA
@@ -18,6 +19,7 @@ class "ia.properties  (solo lo lee su dueño)" as IAP {
   <grupoClave>.clave
   <id>.modelo · <id>.url
   lote · umbralBloque
+  aceptarAutomatico · umbralAutomatico (3.2)
 }
 class "catalogos/GMDN.tsv" as G {
   #CATALOGO · versión · tipo · origen · fecha · hoja

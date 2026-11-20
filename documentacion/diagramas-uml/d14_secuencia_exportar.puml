@@ -1,6 +1,6 @@
 @startuml
 !include estilo.iuml
-title Secuencia: exportar el resultado (un fichero por centro)
+title Secuencia: exportar el resultado (un fichero por centro elegido)
 autonumber
 actor Usuario
 participant "VentanaPrincipal" as VP
@@ -13,15 +13,21 @@ Usuario -> VP : Archivo → Exportar → Resultado (Ctrl+E)
 VP -> DE : mostrar(proyecto, opciones anteriores)
 activate DE
 DE -> EXP : previsualizar(p, opciones)
-EXP --> DE : ficheros por centro (nombre, nº de equipos)
-Usuario -> DE : formato, contenido, carpeta, nombre → «Exportar»
+EXP --> DE : ficheros por centro (nombre, nº de equipos),\ntodos marcados (o los de la vez anterior)
+Usuario -> DE : formato, contenido, carpeta, nombre
+Usuario -> DE : marca o desmarca los ficheros\n(«Todos» / «Ninguno»)
+DE -> DE : «Se generarán n de m ficheros (e equipos)»
+Usuario -> DE : «Exportar»
+alt ninguno marcado
+  DE --> Usuario : «Marca al menos un fichero»
+end
 DE --> VP : Opciones
 deactivate DE
 VP -> ES : ejecutar("Generando…", "equipos")
 activate ES
 ES -> EXP : exportar(p, opciones, avance)
 EXP -> EXP : repartir equipos por centro\n(en el orden del inventario)
-loop cada centro
+loop cada centro elegido (opciones.centros)
   EXP -> EW : escribir(destino, cabecera, Filas)
   note right of EW
     cada fila se genera al escribirla:

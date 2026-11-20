@@ -5,3 +5,4 @@ codigo-fuente/build/
 codigo-fuente/pruebas/clases/
 codigo-fuente/pruebas/trabajo*/
 *.log
+codigo-fuente/pruebas/trabajo_mock.out

@@ -1,6 +1,6 @@
 @startuml
 !include estilo.iuml
-title Secuencia: pedir propuestas para todos los pendientes y aceptar en bloque
+title Secuencia: pedir propuestas para todos los pendientes y aceptarlas (en bloque o automáticamente)
 autonumber
 actor Usuario
 participant "VentanaPrincipal" as VP
@@ -9,7 +9,8 @@ participant "AsistenteIA" as AS
 participant "PropuestasGuardadas" as PG
 participant "Almacen" as AL
 participant "Memoria" as ME
-Usuario -> VP : IA → Pedir propuestas para todos…
+participant "AceptacionIA" as AC
+Usuario -> VP : IA → Pedir propuestas para todos…\n(o al importar, con la aceptación automática)
 VP -> VP : faltan = no revisados sin propuesta\nconsultas ≈ faltan / 8
 VP -> Usuario : «Se pedirá a … para N grupos (M equipos)\nen K consultas… ¿Empezar?»
 Usuario -> VP : Aceptar
@@ -25,7 +26,14 @@ loop cada lote de 8, mientras no se cancele
   end
 end
 deactivate ES
-VP -> Usuario : resumen: con término, sin término,\nconsultas, segundos, tokens
+opt opción «aceptar sin preguntar las propuestas ≥ N %» (3.2)
+  VP -> AC : seguros(pendientes, propuestas, catálogos, N)\n(sin el grupo en pantalla)
+  AC --> VP : grupos
+  VP -> AC : aceptar(grupos, …, «IA automática», fecha)
+  AC -> ME : aprender(…)
+  VP -> AL : registrarCambios(proyecto, grupos)
+end
+VP -> Usuario : resumen: con término, sin término,\nconsultas, segundos, tokens\n(y grupos aceptados solos)
 == Aceptar en bloque ==
 Usuario -> VP : IA → Aceptar en bloque las propuestas más seguras…
 VP -> Usuario : confianza mínima (90 %) · «Se aceptarán N grupos»

@@ -183,6 +183,27 @@ public final class ConfigIA {
         p.setProperty("umbralBloque", String.valueOf(n));
     }
 
+    /**
+     * Opción de catalogación automática del modo IA (desactivada por defecto): las
+     * propuestas con al menos {@link #getUmbralAutomatico()} % de confianza se aceptan
+     * sin preguntar.
+     */
+    public synchronized boolean isAceptarAutomatico() {
+        return "true".equals(p.getProperty("aceptarAutomatico"));
+    }
+
+    public synchronized void setAceptarAutomatico(boolean si) {
+        p.setProperty("aceptarAutomatico", String.valueOf(si));
+    }
+
+    public synchronized int getUmbralAutomatico() {
+        return entero("umbralAutomatico", UMBRAL_BLOQUE_POR_DEFECTO, 50, 100);
+    }
+
+    public synchronized void setUmbralAutomatico(int n) {
+        p.setProperty("umbralAutomatico", String.valueOf(Math.max(50, Math.min(100, n))));
+    }
+
     private int entero(String clave, int porDefecto, int min, int max) {
         try {
             int v = Integer.parseInt(p.getProperty(clave, String.valueOf(porDefecto)).trim());

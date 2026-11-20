@@ -65,6 +65,7 @@ package util {
     + {static} limpio(s) : String
     + {static} palabrasSignificativas(norm) : String[]
     + {static} clave(s) : String
+    + {static} claveIdentico(nombre, marca, modelo) : String
     + {static} distancia(a, b, max) : int
     + {static} html(s) : String
   }

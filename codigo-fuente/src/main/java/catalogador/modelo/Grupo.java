@@ -16,6 +16,11 @@ public final class Grupo {
     /** Código de Equipo_codiTipoActivo que identifica la electromedicina. */
     public static final String TIPO_ELECTROMEDICINA = "E";
 
+    /** Principio del origen de los grupos catalogados solos por ser idénticos a otro ya catalogado. */
+    public static final String ORIGEN_AUTOMATICO = "Automático";
+    /** Principio del origen de las propuestas de la IA aceptadas solas. */
+    public static final String ORIGEN_IA_AUTOMATICA = "IA automática";
+
     private final String clave;
     private final String tipoActivo;
 
@@ -35,6 +40,7 @@ public final class Grupo {
     private boolean variosModelos;
     private int orden = -1;
     private String textoFiltro;
+    private String claveIdentico;
 
     // Resultado de la revisión
     private EstadoGrupo estado = EstadoGrupo.PENDIENTE;
@@ -182,6 +188,23 @@ public final class Grupo {
 
     public Variantes getVariantesReferencia() {
         return variantesReferencia;
+    }
+
+    /**
+     * Clave de «equipo idéntico» del grupo (nombre, marca y modelo; ver
+     * {@link Texto#claveIdentico}). Se calcula una vez.
+     */
+    public String claveIdentico() {
+        if (claveIdentico == null) {
+            claveIdentico = Texto.claveIdentico(nombre, marca, modelo);
+        }
+        return claveIdentico;
+    }
+
+    /** true si lo catalogó el programa solo (idéntico a otro ya catalogado, o propuesta de la IA aceptada sola). */
+    public boolean esAutomatico() {
+        return estado == EstadoGrupo.REVISADO
+                && (origen.startsWith(ORIGEN_AUTOMATICO) || origen.startsWith(ORIGEN_IA_AUTOMATICA));
     }
 
     /** Texto normalizado para el filtro de la cola (se calcula una vez). */

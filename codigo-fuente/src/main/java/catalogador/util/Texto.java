@@ -110,6 +110,16 @@ public final class Texto {
         return String.join(" ", p);
     }
 
+    /**
+     * Clave de «equipo idéntico»: las mismas palabras del nombre (en cualquier orden y sin
+     * contar «de», «la», «para»…), la misma marca y el mismo modelo, sin distinguir mayúsculas,
+     * tildes ni signos. Es el criterio con el que se juntan en un grupo los equipos iguales de
+     * un inventario y con el que una sugerencia sale al 100 %.
+     */
+    public static String claveIdentico(String nombre, String marca, String modelo) {
+        return clave(nombre) + "|" + normalizar(marca) + "|" + normalizar(modelo);
+    }
+
     /** Conjunto de trigramas de caracteres ("  b", " bo", "bom", ...). */
     public static Set<String> trigramas(String s) {
         Set<String> r = new HashSet<>();

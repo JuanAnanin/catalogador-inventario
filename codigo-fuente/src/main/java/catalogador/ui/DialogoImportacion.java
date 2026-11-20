@@ -15,6 +15,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTable;
 import javax.swing.KeyStroke;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -94,7 +95,7 @@ final class DialogoImportacion extends JDialog {
 
         // ---- Explicación
         JPanel arriba = new JPanel(new BorderLayout(0, 4));
-        JLabel lblExp = new JLabel(Estilo.envolver(explicacion, 760));
+        JLabel lblExp = new JLabel(Estilo.envolver(explicacion, 680));
         arriba.add(lblExp, BorderLayout.NORTH);
         JLabel lblFichero = Estilo.etiqueta("Fichero: " + fichero.getName(), Font.PLAIN, 12f, Estilo.TEXTO_SUAVE);
         arriba.add(lblFichero, BorderLayout.SOUTH);
@@ -132,14 +133,33 @@ final class DialogoImportacion extends JDialog {
             config.add(extra, g);
         }
 
-        JPanel centro = new JPanel(new BorderLayout(0, 10));
-        centro.add(config, BorderLayout.NORTH);
+        // Los campos (y las opciones de debajo) se desplazan si no caben, para que la vista previa
+        // siempre tenga sitio, también en pantallas pequeñas.
+        JScrollPane scrollConfig = new JScrollPane(config, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollConfig.setBorder(BorderFactory.createEmptyBorder());
+        scrollConfig.getVerticalScrollBar().setUnitIncrement(16);
+        int altoConfig = config.getPreferredSize().height;
+        int alto = 680 + (extra != null ? extra.getPreferredSize().height + 20 : 0);
+        int altoUtil = Estilo.zonaUtil().height - 16;
+        scrollConfig.setMinimumSize(new java.awt.Dimension(10,
+                Math.min(altoConfig, Math.max(150, Math.min(alto, altoUtil) - 330))));
+        JPanel centro = new JPanel(new GridBagLayout());
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridx = 0;
+        gc.gridy = 0;
+        gc.weightx = 1;
+        gc.weighty = 0;
+        gc.fill = GridBagConstraints.BOTH;
+        centro.add(scrollConfig, gc);
 
         tablaVista.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         tablaVista.setRowHeight(22);
         tablaVista.setDefaultRenderer(Object.class, new RenderVista());
         tablaVista.getTableHeader().setReorderingAllowed(false);
         JScrollPane scroll = new JScrollPane(tablaVista);
+        scroll.setMinimumSize(new java.awt.Dimension(100, 130));
+        scroll.setPreferredSize(new java.awt.Dimension(600, 200));
         JPanel vista = new JPanel(new BorderLayout(0, 4));
         JPanel tituloVista = new JPanel(new BorderLayout());
         tituloVista.add(Estilo.etiqueta("Vista previa (en azul las columnas elegidas)", Font.BOLD, 12f, Estilo.TEXTO),
@@ -148,7 +168,11 @@ final class DialogoImportacion extends JDialog {
         tituloVista.add(lblFilas, BorderLayout.EAST);
         vista.add(tituloVista, BorderLayout.NORTH);
         vista.add(scroll, BorderLayout.CENTER);
-        centro.add(vista, BorderLayout.CENTER);
+        vista.setMinimumSize(new java.awt.Dimension(100, 160));
+        gc.gridy = 1;
+        gc.weighty = 1;
+        gc.insets = new Insets(10, 0, 0, 0);
+        centro.add(vista, gc);
         raiz.add(centro, BorderLayout.CENTER);
 
         // ---- Botones
@@ -185,7 +209,7 @@ final class DialogoImportacion extends JDialog {
         cargando = false;
         recargarColumnas();
 
-        Estilo.ajustarAPantalla(this, 900, 680, 700, 520, padre);
+        Estilo.ajustarAPantalla(this, 900, alto, 700, 520, padre);
     }
 
     private static void anadirFila(JPanel p, GridBagConstraints g, int fila, String etiqueta, JComponent comp,

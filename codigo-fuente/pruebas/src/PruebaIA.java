@@ -1,14 +1,17 @@
+import catalogador.ia.AceptacionIA;
 import catalogador.ia.AsistenteIA;
 import catalogador.ia.ClienteIA;
 import catalogador.ia.ConfigIA;
 import catalogador.ia.PropuestaIA;
 import catalogador.ia.PropuestasGuardadas;
 import catalogador.ia.ProveedorIA;
+import catalogador.logica.CatalogacionAutomatica;
 import catalogador.logica.Catalogos;
 import catalogador.logica.ImportadorCatalogos;
 import catalogador.logica.ImportadorInventario;
 import catalogador.logica.Memoria;
 import catalogador.logica.Sugerencia;
+import catalogador.modelo.EstadoGrupo;
 import catalogador.modelo.Grupo;
 import catalogador.modelo.Proyecto;
 import catalogador.modelo.TipoLista;
@@ -108,6 +111,16 @@ public class PruebaIA {
         comprobar(ConfigIA.ocultar("gsk_123456789abcdef").equals("gsk_…cdef"), "la clave se muestra oculta");
         comprobar(cfg2.estaListo(groq) && !cfg2.estaListo(ProveedorIA.porId("openai")), "listo solo con clave");
         comprobar(cfg2.estaListo(ollama), "Ollama no necesita clave");
+        comprobar(!cfg2.isAceptarAutomatico() && cfg2.getUmbralAutomatico() == 90,
+                "aceptar solas las propuestas: desactivado por defecto (confianza mínima propuesta: 90 %)");
+        cfg2.setAceptarAutomatico(true);
+        cfg2.setUmbralAutomatico(95);
+        cfg2.guardar();
+        ConfigIA cfg3 = new ConfigIA(tmp);
+        cfg3.setUmbralAutomatico(130);
+        comprobar(new ConfigIA(tmp).isAceptarAutomatico() && new ConfigIA(tmp).getUmbralAutomatico() == 95
+                        && cfg3.getUmbralAutomatico() == 100,
+                "la opción y su porcentaje se guardan (y el porcentaje no pasa de 100)");
         comprobar(cfg2.getLote(ollama) == 4 && cfg2.getLote(groq) == 4 && cfg2.getLote(ProveedorIA.porId("openai")) == 8,
                 "grupos por consulta: 4 en los locales y en Groq gratis, 8 en los demás");
         try {
@@ -176,6 +189,57 @@ public class PruebaIA {
         Sugerencia iaOtra = Sugerencia.deIA(TipoLista.GMDN, "10003", "Faja", 95, "", "x");
         comb = Sugerencia.combinar(Arrays.asList(memS), iaOtra, 3);
         comprobar(comb.size() == 2 && comb.get(0).esDeIA(), "no coinciden → se ordenan por porcentaje");
+
+        System.out.println("== Catalogación automática en modo IA (opción: aceptar solas las propuestas más seguras)");
+        Path dirAuto = tmp.resolve("auto");
+        Files.createDirectories(dirAuto);
+        PropuestasGuardadas pAuto = new PropuestasGuardadas(dirAuto);
+        pAuto.guardar(r.getPropuestas());
+        int umbral = 90;
+        List<PropuestaIA> altas = new ArrayList<>();
+        int bajas = 0;
+        for (PropuestaIA x : r.getPropuestas()) {
+            if (x.tieneTermino() && x.getConfianza() >= umbral) {
+                altas.add(x);
+            } else {
+                bajas++;
+            }
+        }
+        Grupo duda = proyecto.getGrupo(altas.get(0).getClaveGrupo());
+        duda.posponer("15/12/2026 10:00");
+        List<Grupo> segurosIA = AceptacionIA.seguros(grupos, pAuto, cats, umbral);
+        comprobar(!altas.isEmpty() && bajas > 0 && segurosIA.size() == altas.size() - 1 && !segurosIA.contains(duda),
+                "con el 90 %: " + segurosIA.size() + " propuestas se aceptarían solas; " + bajas + " no llegan (o no tienen "
+                        + "término) y el grupo pospuesto no se toca");
+        comprobar(AceptacionIA.seguros(grupos, pAuto, cats, 99).isEmpty(), "con el 99 % no se acepta ninguna (ninguna llega)");
+        Memoria memAuto = new Memoria(dirAuto);
+        memAuto.cargar();
+        AceptacionIA.aceptar(segurosIA, pAuto, memAuto, AceptacionIA.AUTOMATICA, "15/12/2026 10:01");
+        boolean bienAceptadas = true;
+        for (Grupo g : segurosIA) {
+            PropuestaIA x = pAuto.get(g.getClave());
+            bienAceptadas &= g.getEstado() == EstadoGrupo.REVISADO && g.esAutomatico() && g.getCodigo().equals(x.getCodigo())
+                    && g.getOrigen().equals("IA automática: " + x.getFuente() + " (" + x.getConfianza() + "% de confianza)");
+        }
+        comprobar(bienAceptadas && memAuto.tamano() == segurosIA.size(),
+                "quedan revisados con su término y el origen «IA automática: servicio (NN% de confianza)», y se aprenden");
+        long pendientesConPropuesta = grupos.stream().filter(g -> g.getEstado() == EstadoGrupo.PENDIENTE
+                && pAuto.tiene(g.getClave())).count();
+        comprobar(pendientesConPropuesta == bajas, "las demás siguen pendientes con su propuesta, para revisarlas");
+        Grupo aceptado = segurosIA.get(0);
+        Proyecto otro = new Proyecto();
+        otro.anadirEquipo("GAIVI", "700001", aceptado.getNombre().toLowerCase(), "", aceptado.getMarca(), aceptado.getModelo(),
+                "X");
+        otro.terminarCarga();
+        otro.agrupar();
+        List<Grupo> idem = CatalogacionAutomatica.aplicar(otro.getGrupos(), memAuto, cats, "15/12/2026 10:02");
+        comprobar(idem.size() == 1 && idem.get(0).getCodigo().equals(aceptado.getCodigo()),
+                "con las dos opciones: un equipo idéntico de otro inventario se cataloga solo con lo aceptado de la IA");
+        Grupo enBloque = proyecto.getGrupo(altas.get(0).getClaveGrupo());
+        enBloque.reiniciar();
+        AceptacionIA.aceptar(Arrays.asList(enBloque), pAuto, memAuto, AceptacionIA.EN_BLOQUE, "15/12/2026 10:03");
+        comprobar(enBloque.getOrigen().startsWith("IA en bloque: ") && !enBloque.esAutomatico(),
+                "«Aceptar en bloque» (a mano) usa la misma regla pero no cuenta como automático");
 
         System.out.println("== Cada servicio con sus particularidades (simulados según su documentación)");
         servicio("OpenAI", "openai", "/openai/v1", "gpt-6-luna",

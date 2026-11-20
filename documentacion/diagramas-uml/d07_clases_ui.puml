@@ -44,7 +44,9 @@ class VentanaPrincipal {
   - pedirIA(g) / enviarIA(lote)
   - trasRespuestaIA(...)
   - aceptarPropuestaIA() / repreguntarIA()
-  - pedirTodasIA() / aceptarEnBloqueIA()
+  - pedirTodasIA(automatica) / aceptarEnBloqueIA()
+  - abrirAutomatico() / catalogarIdenticosAhora()
+  - catalogarSolo(identicos, excepto) : int
 }
 class DialogoModo {
   - cfg : ConfigIA
@@ -63,8 +65,19 @@ class DialogoEntradaMantenimiento {
   - aceptar() : void
 }
 class DialogoExportar {
+  - tablaFicheros : JTable
   ~ {static} mostrar(padre, proyecto, previas) : Opciones
-  - refrescarVista() : void
+  - refrescarVista() / refrescarElegidos()
+}
+class DialogoAutomatico {
+  ~ {static} mostrar(padre, actuales, modoIA, previsto) : Opciones
+}
+class "DialogoAutomatico.Opciones" as AO {
+  ~ identicos, ia : boolean
+  ~ umbral : int
+}
+class "DialogoAutomatico.Panel" as AP {
+  ~ opciones() : Opciones
 }
 class DialogoImportacion {
   ~ mostrar() : boolean
@@ -92,6 +105,9 @@ JDialog <|-- DialogoEntradaMantenimiento
 JDialog <|-- DialogoExportar
 JDialog <|-- DialogoImportacion
 JDialog <|-- DialogoModo
+JPanel <|-- AP
+DialogoAutomatico *-- AP
+AP ..> AO
 JPanel <|-- PanelBienvenida
 AbstractTableModel <|-- MC
 AbstractTableModel <|-- MR
@@ -108,6 +124,8 @@ VentanaPrincipal ..> DialogoEntradaMantenimiento
 VentanaPrincipal ..> DialogoExportar
 VentanaPrincipal ..> DialogoImportacion
 VentanaPrincipal ..> DialogoModo
+VentanaPrincipal ..> DialogoAutomatico
+DialogoImportacion o-- "0..1" AP : (al importar)
 VentanaPrincipal ..> Espera
 Espera ..> AV : crea
 VentanaPrincipal ..> Estilo

@@ -1,4 +1,4 @@
-﻿Pruebas automáticas del Catalogador 3.1
+﻿Pruebas automáticas del Catalogador 3.2
 =======================================
 Son las que se usaron para verificar los requisitos: sus entradas y resultados están en el
 capítulo «Verificación» de documentacion/01_Especificacion_de_Requisitos_ERS.pdf.
@@ -11,21 +11,26 @@ FORMA RÁPIDA
   macOS / Linux .. ./ejecutar_pruebas.sh               (o «./ejecutar_pruebas.sh rapido»)
                    ejecuta también PruebaIA si hay python3
   Rendimiento .... «ejecutar_pruebas.bat rendimiento» o «./ejecutar_pruebas.sh rendimiento»
-Deben terminar con «TODO OK (57 comprobaciones)» y «TODO OK (99 comprobaciones)»
-(55 con «rapido», que no lee el inventario de 600.000 filas).
+Deben terminar con «TODO OK (74 comprobaciones)» y «TODO OK (107 comprobaciones)»
+(72 con «rapido», que no lee el inventario de 600.000 filas).
 
 QUÉ HAY
   src/catalogador/ui/PruebaRequisitos.java
-      57 comprobaciones de los requisitos con los Excel recibidos (incluido el inventario
+      74 comprobaciones de los requisitos con los Excel recibidos (incluido el inventario
       recibido catalogado de principio a fin y comparado fila a fila con lo esperado), el
-      paquete de pruebas de la carpeta «datos» y el inventario de 600.000 filas.
+      paquete de pruebas de la carpeta «datos» y el inventario de 600.000 filas. Desde la 3.2,
+      también la catalogación automática de los idénticos (con el ejemplo de la «Hoja de
+      mejoras del programa»), exportar uno, varios o todos los centros e inventarios con
+      las columnas en otro orden, de más o de menos.
   src/PruebaIA.java
-      99 comprobaciones del modo IA contra mock_ia.py, un servidor que reproduce la API y el
+      107 comprobaciones del modo IA (también la aceptación automática de las propuestas
+      más seguras) contra mock_ia.py, un servidor que reproduce la API y el
       comportamiento documentado de cada servicio (OpenAI, Gemini, Anthropic, Groq, Mistral,
       DeepSeek, OpenRouter, Cerebras, Cohere, xAI, Hugging Face, LM Studio y Ollama con diez
       modelos) y sus errores. No gasta consultas reales ni necesita claves.
   src/Rendimiento.java
-      Mide cada paso con un inventario grande y compara el resultado exportado con el esperado.
+      Mide cada paso con un inventario grande y compara el resultado exportado con el esperado;
+      también exportar un solo centro y catalogar solos los idénticos de un inventario posterior.
   src/catalogador/ui/CapturasManual.java, src/PrepararDatos.java
       Recorren la aplicación como una persona y hacen las capturas del manual (necesitan
       pantalla; se compilan sin --release y con --add-exports java.desktop/sun.font=ALL-UNNAMED).
@@ -34,10 +39,16 @@ QUÉ HAY
       Con la clave «mal» responde 401, «sinsaldo» 402, «cuota» 429 por día, «lento429» pide
       esperar, «fallo500» falla 1 de cada 3 consultas… (ver el comentario del principio).
   datos/
-      Catalogos_PRUEBA.xlsx                el catálogo recibido + 6 términos GMDN de prueba
+      Catalogos_PRUEBA.xlsx                el catálogo recibido + 7 términos GMDN de prueba
+                                           (entre ellos el 34870 de la hoja de mejoras)
       Inventario_PRUEBA_casos.xlsx y .csv  51 filas con todos los casos (bajas, otros valores,
                                            electromedicina, nombres escritos de varias formas…)
       Inventario_PRUEBA_otros_titulos.xlsx el mismo con otros títulos de columna
+      Inventario_PRUEBA_columnas.xlsx      el mismo con las columnas en otro orden, 3 de más y
+                                           sin Equipo_referencia ni Equipo_codiTipoActivo
+      Inventario_PRUEBA_automatico.xlsx    inventario «posterior» para la catalogación automática:
+                                           la cama HILL-ROM de la hoja de mejoras escrita de dos
+                                           formas y equipos idénticos, parecidos y dudosos
       Resultado_anterior_PRUEBA.xlsx       un resultado anterior con un equipo inexistente y un
                                            grupo en conflicto
 

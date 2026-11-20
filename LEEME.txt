@@ -1,5 +1,20 @@
-﻿CATALOGADOR DE INVENTARIO HOSPITALARIO · versión 3.1
+﻿CATALOGADOR DE INVENTARIO HOSPITALARIO · versión 3.2
 ====================================================
+
+NOVEDADES DE LA VERSIÓN 3.2 («Hoja de mejoras del programa»)
+- Catalogación automática OPCIONAL (desactivada por defecto: si no se activa, se sigue
+  verificando cada grupo antes de aceptarlo). Revisión → Catalogación automática (opciones)…,
+  el botón «Catalogación automática» de la cabecera o las casillas al importar un inventario:
+    · Catalogar sin preguntar los equipos idénticos a otros ya catalogados (coincidencia del
+      100 %: las mismas palabras del nombre en cualquier orden, la misma marca y el mismo
+      modelo). Les asigna el mismo código y nombre. Funciona en modo manual y en modo IA,
+      al importar, al abrir un proyecto y cada vez que se cataloga un equipo.
+    · Modo IA: aceptar sin preguntar las propuestas de la IA con al menos N % de confianza.
+  Lo catalogado así se repasa con el filtro «Catalogados automáticamente» de la cola y se
+  puede devolver a pendiente.
+- Al exportar se eligen los ficheros que se generan: uno, varios o todos los centros
+  (botones «Todos» y «Ninguno»).
+- Inventarios con otros títulos o con más o menos columnas: ver el anexo B del manual.
 
 PARA PROBARLO RÁPIDAMENTE
   documentacion/04_Guia_rapida_de_prueba.pdf: en una hora, paso a paso, con lo que tiene que
@@ -32,7 +47,7 @@ La primera vez pregunta cómo quieres trabajar:
                                        Hugging Face
     Otro servicio compatible con OpenAI (por ejemplo, un servidor del hospital)
   Cómo conseguir la clave de cada uno: botón «¿Cómo se consigue?» en el programa y
-  capítulo 8 del manual. Para empezar gratis: Groq o Google Gemini.
+  capítulo 9 del manual. Para empezar gratis: Groq o Google Gemini.
   Ollama en local: ollama.com/download y, en una terminal, «ollama pull qwen3:8b»
   (en un Mac con chip Apple y 24 GB, o un PC con tarjeta gráfica de 16 GB, mejor
   «ollama pull gpt-oss:20b», más preciso; también valen qwen3.5, gemma4, gemma3,
@@ -52,7 +67,9 @@ PRIMEROS PASOS (con los ficheros de la carpeta «ejemplos»)
   o  EJEMPLO_inventario_demostracion_600000.xlsx    (600.000 filas, mismo formato, inventadas)
    Las columnas se reconocen solas por sus títulos (Equipo_codiCentro, Equipo_idEquipo,
    Equipo_nombre, Equipo_referencia, refMarca_nombre, Equipo_modelo,
-   Equipo_codiTipoActivo, refArea_nombre, Equipo_debaja); si no, se eligen a mano.
+   Equipo_codiTipoActivo, refArea_nombre, Equipo_debaja), en cualquier orden y aunque haya
+   columnas de más o falten las opcionales; con otros títulos, se eligen en una ventana
+   que ya propone las que se parecen. Solo hacen falta el centro, el id y el nombre.
    Se descartan los equipos con Equipo_debaja = S; solo se catalogan los que tienen N.
 3. Revisa los grupos y exporta: Archivo → Exportar → Resultado… (Ctrl+E).
    «Datos_que_el_programa_debe_devolver.xlsx» es el ejemplo de salida recibido.
@@ -73,6 +90,8 @@ QUÉ HACE
 - Aprende de cada clasificación y sugiere la misma respuesta para equipos parecidos.
 - En modo IA: propuestas en segundo plano, «Pedir propuestas para todos los grupos
   pendientes» y «Aceptar en bloque las propuestas más seguras» (menú IA).
+- Si se activa, cataloga solo lo idéntico a lo ya catalogado (y, en modo IA, las propuestas
+  más seguras). Por defecto no cataloga nada sin que lo veas.
 
 TECLADO (en Mac, ⌘ en lugar de Ctrl y ⇧ en lugar de Mayús)
   Intro ................. Guardar el nombre oficial seleccionado y pasar al siguiente
@@ -92,12 +111,14 @@ TECLADO (en Mac, ⌘ en lugar de Ctrl y ⇧ en lugar de Mayús)
   Doble clic en un resultado del buscador: asignarlo y guardar.
 
 COLORES DE LA SUGERENCIA
-  Verde (85 % o más): casi seguro · Naranja (65–84 %): revísalo · Rojo (menos de 65 %): dudoso
+  Verde (85 % o más): casi seguro (100 % «Idéntico») · Naranja (65–84 %): revísalo
+  Rojo (menos de 65 %): dudoso
   En modo IA, debajo se lee «Propuesta de la IA» con el motivo, o «y la IA está
   de acuerdo» si coincide con lo que sugiere la memoria.
 
 RESULTADO (Archivo → Exportar → Resultado)
-Un fichero por centro (Equipo_codiCentro), en Excel (.xlsx) o CSV («;», UTF-8), con:
+Un fichero por centro (Equipo_codiCentro; se eligen cuáles: uno, varios o todos),
+en Excel (.xlsx) o CSV («;», UTF-8), con:
   Equipo_codiCentro | Equipo_idEquipo | CÓDIGO GMDN | NOMBRE GMDN y NOMBRE MANTENIMIENTO
 Los equipos catalogados con Mantenimiento no llevan código GMDN (se identifican por el nombre).
 Opciones: incluir también los equipos sin catalogar; añadir columnas de marca y modelo corregidos.
@@ -111,7 +132,7 @@ de tu carpeta personal (Windows: C:\Users\<usuario>\Catalogador; Mac y Linux: ~/
                     (y ia_propuestas.tsv: las propuestas de la IA ya recibidas)
   ia.properties     modo de trabajo y claves de IA (no lo compartas)
 Si el programa se cierra de golpe, al volver a abrirlo continúa en el mismo punto.
-Los proyectos de las versiones 2.0 y 3.0 se abren sin cambios en la 3.1.
+Los proyectos de las versiones 2.0, 3.0 y 3.1 se abren sin cambios en la 3.2.
 
 FORMATOS ADMITIDOS
 .xlsx y .csv (UTF-8 o Windows-1252; separador ; , tabulador o |).
@@ -127,7 +148,8 @@ FICHEROS DE EJEMPLO (carpeta «ejemplos»)
   grandes/CATALOGO_GRANDE_GMDN_30000.xlsx      29.997 términos GMDN (los 16 reales + inventados 9xxxxx)
   grandes/RESULTADO_ESPERADO_GRANDE_650000.xlsx y _1000000.xlsx   lo que debe salir
 Tiempos medidos (2 núcleos, 4 GB para Java): importar 650.000 filas 5 s (CSV 2 s),
-1.000.000 de filas 7 s; exportar 2–3 s; buscar ~10 ms; guardar un grupo <1 ms.
+1.000.000 de filas 7 s; exportar 1–2 s; buscar ~10 ms; guardar un grupo <1 ms;
+catalogar solos los idénticos de un inventario posterior de 1.000.000 de filas 0,1 s.
 
 DOCUMENTACIÓN (carpeta «documentacion»)
   01_Especificacion_de_Requisitos_ERS.pdf   requisitos, casos de uso, modelo de datos, criterios
@@ -136,7 +158,8 @@ DOCUMENTACIÓN (carpeta «documentacion»)
   02_Diagramas_UML_y_Diseno.pdf             arquitectura y diagramas de casos de uso, clases,
                                             secuencia, actividad (flujo), estados y datos
   03_Manual_de_Usuario.pdf                  manual paso a paso con capturas y ejemplos en Windows,
-                                            y cómo conseguir la clave de cada servicio de IA
+                                            la catalogación automática y cómo conseguir la
+                                            clave de cada servicio de IA
   04_Guia_rapida_de_prueba.pdf              comprobar en una hora que cumple lo pedido
   diagramas-uml/                            fuentes PlantUML (.puml) y diagramas (.svg)
 

@@ -28,6 +28,17 @@ else (no)
   agrupar los iguales y ordenar
   de más a menos equipos;
 endif
+if (¿Catalogación automática activada?
+(desactivada por defecto)) then (sí)
+  :Catalogar solos los grupos idénticos
+  a otros ya catalogados (100 %);
+  if (¿Modo IA y «aceptar las propuestas ≥ N %»?) then (sí)
+    :Pedir propuestas para todos los
+    pendientes y aceptar solas las ≥ N %;
+  else (no)
+  endif
+else (no: se verifica cada grupo)
+endif
 if (¿Modo IA y muchos grupos?) then (sí)
   :Opcional: pedir propuestas para todos
   y aceptar en bloque las más seguras;
@@ -44,7 +55,8 @@ if (¿Hay grupos pospuestos?) then (sí)
 else (no)
 endif
 :Exportar resultado
-(un Excel o CSV por centro);
+(un Excel o CSV por centro:
+todos o los elegidos);
 if (¿Se crearon entradas de mantenimiento?) then (sí)
   :Exportar catálogos actualizados
   (mismo formato que el original);

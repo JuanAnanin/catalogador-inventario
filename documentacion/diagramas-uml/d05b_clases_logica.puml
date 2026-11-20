@@ -11,6 +11,7 @@ class Memoria {
   - entradas : List<Entrada>
   - porClave : Map<String,Integer>
   - indice : Map<Integer,Enteros>
+  - porIdentico : Map<String,Enteros>
   - marcas, modelos : Map<String,String>
   - pendientes : List<String>
   --
@@ -19,6 +20,8 @@ class Memoria {
   + compactar() : void
   + aprender(nombre, marca, modelo, lista, codigo, nombreOficial, fecha) : void
   + olvidar(nombre, marca, modelo) : void
+  + olvidarIdenticos(nombre, marca, modelo) : void
+  + identica(claveIdentico) : Entrada
   + aprenderMarca(original, corregida) : void
   + aprenderModelo(original, corregido) : void
   + marcaConocida(original) : String
@@ -80,6 +83,7 @@ class Exportador <<utilidad>> {
   + {static} CABECERA : List<String>
   + {static} previsualizar(p, opciones) : List<Fichero>
   + {static} exportar(p, opciones, progreso) : List<Fichero>
+  + {static} seleccionados(p, opciones) : List<Fichero>
   + {static} nombreFichero(prefijo, centro, ext) : String
   + {static} marcaFinal(g, original) : String
   + {static} modeloFinal(g, original) : String
@@ -90,7 +94,23 @@ class "Exportador.Opciones" as Op {
   + incluirMarcaModelo : boolean
   + carpeta : File
   + prefijo : String
+  + centros : Set<String>
+  + incluye(centro) : boolean
 }
+class CatalogacionAutomatica <<utilidad>> {
+  + {static} ORIGEN = "Automático: idéntico…"
+  + {static} terminoPara(g, memoria, catalogos) : TerminoOficial
+  + {static} candidatos(grupos, memoria, catalogos) : List<Grupo>
+  + {static} aplicar(grupos, memoria, catalogos, fecha) : List<Grupo>
+  + {static} equipos(grupos) : long
+}
+note right of CatalogacionAutomatica
+  Versión 3.2 (opcional). Un grupo PENDIENTE,
+  con nombre y una sola marca y modelo, se
+  cataloga solo si la memoria tiene idénticos
+  a él (RN-18) y todos con el mismo término,
+  presente en el catálogo cargado (RN-19).
+end note
 class Diario {
   - fichero : Path
   + anadir(lineas : List<String>) : void
@@ -107,4 +127,5 @@ Memoria --> "1" Diario : memoria.diario.tsv
 Almacen ..> Diario : cambios.tsv
 Almacen ..> PAE : lanza
 Exportador ..> Op
+CatalogacionAutomatica ..> Memoria : identica()
 @enduml

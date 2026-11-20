@@ -5,8 +5,8 @@
     <key>CFBundleName</key><string>Catalogador</string>
     <key>CFBundleDisplayName</key><string>Catalogador</string>
     <key>CFBundleIdentifier</key><string>es.hospital.catalogador</string>
-    <key>CFBundleVersion</key><string>3.1</string>
-    <key>CFBundleShortVersionString</key><string>3.1</string>
+    <key>CFBundleVersion</key><string>3.2</string>
+    <key>CFBundleShortVersionString</key><string>3.2</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>Catalogador</string>
     <key>CFBundleIconFile</key><string>Catalogador</string>

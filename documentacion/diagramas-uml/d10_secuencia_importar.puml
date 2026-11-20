@@ -9,6 +9,7 @@ participant "ImportadorInventario" as II
 participant "LectorTablas" as LT
 participant "Proyecto" as P
 participant "Almacen" as AL
+participant "CatalogacionAutomatica" as CA
 Usuario -> VP : Archivo → Importar → Inventario (fichero)
 VP -> ES : ejecutar("Buscando las columnas…")
 activate ES
@@ -17,7 +18,7 @@ II -> LT : recorrer(f, hoja, receptor) (primeras 30 filas)
 LT --> II : fila de cabeceras
 II --> ES : Mapeo (hoja, fila, columnas)
 deactivate ES
-VP -> Usuario : columnas encontradas · trato de las bajas\n¿separar por marca y modelo?
+VP -> Usuario : columnas encontradas · trato de las bajas\n¿separar por marca y modelo?\n¿catalogación automática? (desmarcada por defecto)
 Usuario -> VP : «Importar»
 VP -> ES : ejecutar("Leyendo el inventario…", "filas")
 activate ES
@@ -38,6 +39,14 @@ II -> P : agrupar()
 P -> P : clave = palabras ordenadas | marca | modelo | tipo\nordenar de más a menos equipos
 ES -> AL : nuevaCarpetaProyecto() · guardarInventario(p)\n· guardarEstado(p)
 deactivate ES
+opt opción «catalogar sin preguntar los idénticos» activada
+  VP -> CA : aplicar(grupos, memoria, catálogos, fecha)
+  CA --> VP : grupos catalogados (origen «Automático»)
+  VP -> AL : registrarCambios(p, grupos)
+end
 VP -> VP : abrirProyecto(p) · mostrarGrupo(primer pendiente)
-VP --> Usuario : resumen (leídas, bajas, equipos, grupos, centros)
+VP --> Usuario : resumen (leídas, bajas, equipos, grupos, centros\ny catalogados automáticamente)
+opt modo IA y «aceptar sin preguntar las propuestas ≥ N %» activada
+  VP -> VP : pedirTodasIA(automática) (ver d25)\ny aceptar las propuestas ≥ N %
+end
 @enduml

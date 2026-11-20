@@ -7,10 +7,16 @@ state Pendiente
 state Revisado : catálogo, código y nombre\noficial asignados;\nmarca/modelo corregidos
 state "Pospuesto (duda)" as Pospuesto : sin asignación;\nmarca/modelo corregidos\nse conservan
 Pendiente --> Revisado : guardar /\naceptar sugerencia /\naplicar resultado anterior
+Pendiente --> Revisado : [catalogación automática activada]\nidéntico a uno ya catalogado (100 %)\no propuesta de la IA ≥ N %\n/ origen «Automático» o «IA automática»
 Pendiente --> Pospuesto : posponer
 Pospuesto --> Revisado : guardar /\naceptar sugerencia
 Revisado --> Revisado : guardar de nuevo\n(cambiar término,\nmarca o modelo)
 Revisado --> Pospuesto : posponer\n/ se borra la asignación
-Revisado --> Pendiente : devolver a pendiente\n/ memoria.olvidar()
+Revisado --> Pendiente : devolver a pendiente\n/ memoria.olvidar()\n(y sus idénticos, con la opción)
 Pospuesto --> Pendiente : devolver\na pendiente
+note bottom of Pospuesto
+  La catalogación automática
+  nunca toca los pospuestos
+  ni los revisados.
+end note
 @enduml

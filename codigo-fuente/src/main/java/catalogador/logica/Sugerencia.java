@@ -133,6 +133,9 @@ public final class Sugerencia {
     }
 
     public static String nivel(double similitud) {
+        if (similitud >= 1) {
+            return "Idéntico"; // mismo nombre, marca y modelo: se puede catalogar solo (opción)
+        }
         if (similitud >= UMBRAL_VERDE) {
             return "Casi seguro";
         }

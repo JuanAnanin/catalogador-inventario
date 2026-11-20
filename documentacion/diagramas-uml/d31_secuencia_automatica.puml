@@ -1,0 +1,44 @@
+@startuml
+!include estilo.iuml
+title Secuencia: activar la catalogación automática de los idénticos (versión 3.2)
+autonumber
+actor Usuario
+participant "VentanaPrincipal" as VP
+participant "DialogoAutomatico" as DA
+participant "CatalogacionAutomatica" as CA
+participant "Memoria" as ME
+participant "Catalogos" as CT
+participant "Almacen" as AL
+Usuario -> VP : Revisión → Catalogación automática (opciones)…\n(o botón «Catalogación automática ▾» de la cabecera)
+VP -> DA : mostrar(opciones actuales, modoIA, previsto)
+activate DA
+Usuario -> DA : marca «Catalogar sin preguntar los idénticos…»
+DA -> VP : previsto(opciones)
+VP -> CA : candidatos(grupos, memoria, catálogos)
+loop cada grupo PENDIENTE (con nombre y una sola marca y modelo)
+  CA -> ME : identica(g.claveIdentico())
+  ME --> CA : clasificación idéntica, o null si no hay\no si hay dos distintas
+  CA -> CT : porCodigo(lista, código)
+  CT --> CA : término (o null si ya no está)
+end
+CA --> VP : grupos que se catalogarían
+VP --> DA : «se catalogarán ya N grupos idénticos»
+Usuario -> DA : Aceptar
+DA --> VP : Opciones
+deactivate DA
+VP -> VP : guardar la opción (config.properties)
+VP -> CA : aplicar(grupos, memoria, catálogos, fecha)
+CA -> CA : g.asignar(lista, código, nombre,\n«Automático: idéntico a uno ya catalogado (100 %)»)\n· marca y modelo: corrección aprendida u original
+CA --> VP : grupos cambiados
+VP -> AL : registrarCambios(proyecto, grupos)
+VP --> Usuario : «✔ Catalogados automáticamente: N grupos (M equipos).\nPuedes revisarlos con el filtro "Catalogados automáticamente"»
+== Después, con la opción activada ==
+Usuario -> VP : guarda un grupo (Intro)
+VP -> CA : aplicar(pendientes idénticos a ese grupo, …)
+VP -> AL : registrarCambios(…)
+note over VP, AL
+  También al importar un inventario, al abrir un proyecto,
+  al aplicar un resultado anterior o una tabla de
+  clasificaciones y al aceptar propuestas de la IA.
+end note
+@enduml
